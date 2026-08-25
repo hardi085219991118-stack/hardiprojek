@@ -88,7 +88,7 @@ fun MedicineScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .paint(painterResource(com.example.R.drawable.bg_kesehatan), contentScale = ContentScale.Crop)
+                .paint(painterResource(com.example.R.drawable.bg_operasional), contentScale = ContentScale.Crop)
                 .testTag("list_medicines"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)

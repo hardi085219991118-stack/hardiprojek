@@ -78,7 +78,7 @@ fun TutorialScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .paint(painterResource(com.example.R.drawable.bg_panduan), contentScale = ContentScale.Crop)
+                .paint(painterResource(com.example.R.drawable.bg_dashboard), contentScale = ContentScale.Crop)
                 .testTag("screen_tutorial"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)

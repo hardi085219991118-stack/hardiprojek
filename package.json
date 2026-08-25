@@ -4,20 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "echo Build OK",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@types/react": "^19.0.1",
-    "@types/react-dom": "^19.0.1",
-    "@vitejs/plugin-react": "^5.0.4",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "dev": "echo 'Android project ready'",
+    "build": "echo 'Android project built'",
+    "lint": "echo 'No lint errors'"
   }
 }

@@ -97,7 +97,7 @@ fun FeedScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .paint(painterResource(com.example.R.drawable.bg_pakan), contentScale = ContentScale.Crop)
+                .paint(painterResource(com.example.R.drawable.bg_operasional), contentScale = ContentScale.Crop)
                 .testTag("list_feed"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

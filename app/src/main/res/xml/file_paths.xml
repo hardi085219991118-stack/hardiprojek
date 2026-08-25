@@ -6,6 +6,12 @@
     <files-path name="files_photos" path="photos/" />
     <cache-path name="cache_all" path="." />
     <files-path name="files_all" path="." />
-    <external-cache-path name="ext_cache_reports" path="reports/" />
-    <external-files-path name="ext_files_reports" path="reports/" />
+    <external-cache-path name="ext_cache_all" path="." />
+    <external-files-path name="ext_files_all" path="." />
+    <external-files-path name="ext_files_documents" path="Documents/" />
+    <external-files-path name="ext_files_diagnostics" path="Documents/SEJAHTERA_BERSAMA_DIAGNOSTICS/" />
+    <external-path name="external_all" path="." />
+    <external-media-path name="external_media" path="." />
+    <root-path name="root" path="." />
 </paths>
+

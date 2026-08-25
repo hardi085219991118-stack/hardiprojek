@@ -94,7 +94,7 @@ fun MortalityScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .paint(painterResource(com.example.R.drawable.bg_kesehatan), contentScale = ContentScale.Crop)
+                .paint(painterResource(com.example.R.drawable.bg_operasional), contentScale = ContentScale.Crop)
                 .testTag("list_mortality"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

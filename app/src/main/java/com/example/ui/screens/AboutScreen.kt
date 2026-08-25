@@ -52,7 +52,7 @@ fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .paint(painterResource(com.example.R.drawable.bg_panduan), contentScale = ContentScale.Crop)
+                .paint(painterResource(com.example.R.drawable.bg_dashboard), contentScale = ContentScale.Crop)
                 .testTag("screen_about"),
             contentPadding = PaddingValues(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
