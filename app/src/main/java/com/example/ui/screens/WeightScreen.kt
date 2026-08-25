@@ -1,12 +1,17 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.paint
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -15,7 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +35,7 @@ import com.example.ui.FarmViewModel
 import com.example.ui.components.SimpleLineChart
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.PhotoStorageHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -38,6 +46,7 @@ fun WeightScreen(
     viewModel: FarmViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val weightSamples by viewModel.weightSamples.collectAsState()
@@ -237,6 +246,49 @@ fun WeightScreen(
                             }
                         }
                     }
+
+                    if (sample.photoUri.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        var showFullPhoto by remember { mutableStateOf(false) }
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFE8F5E9))
+                                .clickable { showFullPhoto = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = null, tint = FarmGreenPrimary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Lihat Bukti Foto", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
+                        }
+
+                        if (showFullPhoto) {
+                            val bitmap = remember(sample.photoUri) { com.example.util.PhotoStorageHelper.loadBitmapSafe(context, sample.photoUri, maxDim = 800) }
+                            AlertDialog(
+                                onDismissRequest = { showFullPhoto = false },
+                                title = { Text("Bukti Foto Penimbangan Bobot", fontWeight = FontWeight.Bold) },
+                                text = {
+                                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        if (bitmap != null) {
+                                            Image(
+                                                bitmap = bitmap.asImageBitmap(),
+                                                contentDescription = "Bukti Foto",
+                                                modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(8.dp)),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        } else {
+                                            Text("Foto tersimpan di: ${sample.photoUri}", fontSize = 12.sp)
+                                        }
+                                        Text("Hari ke-${sample.ageDays} (${sample.date}) | Rata-rata ${sample.averageWeightGram.toInt()} Gram (${sample.sampleCount} Ekor)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = { showFullPhoto = false }) { Text("Tutup") }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -322,12 +374,14 @@ fun WeightScreen(
                         )
                     }
 
-                                        PhotoProofPicker(
+                    PhotoProofPicker(
                         initialPath = photoPath,
-                        onPathChanged = { photoPath = it }
+                        onPathChanged = { photoPath = it },
+                        feature = "bobot",
+                        title = "Bukti Foto Jarum / Angka Timbangan"
                     )
 
-OutlinedTextField(
+                    OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
                         label = { Text("Keterangan (Lokasi sudut penimbangan dll)") },

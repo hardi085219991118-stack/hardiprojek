@@ -315,9 +315,10 @@ fun DashboardScreen(
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ActionMenuItem(Icons.Default.MenuBook, "Panduan Budidaya", "menu_panduan", containerColor = Color(0xFF2E7D32), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("broiler_guide") }
-                        Spacer(modifier = Modifier.weight(1f))
+                        ActionMenuItem(Icons.Default.Alarm, "Alarm Cerdas Pakan", "menu_feed_alarm", containerColor = Color(0xFFE65100), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("feed_alarm") }
                         Spacer(modifier = Modifier.weight(1f))
                     }
+
                 }
             }
 

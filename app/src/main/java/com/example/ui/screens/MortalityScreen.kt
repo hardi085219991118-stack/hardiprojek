@@ -1,12 +1,17 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.paint
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -15,7 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +35,7 @@ import com.example.ui.FarmViewModel
 import com.example.ui.components.SimpleBarChart
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.PhotoStorageHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -38,6 +46,7 @@ fun MortalityScreen(
     viewModel: FarmViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val mortalityLogs by viewModel.mortalityLogs.collectAsState()
@@ -189,43 +198,88 @@ fun MortalityScreen(
             }
 
             items(mortalityLogs.reversed()) { log ->
+                var showFullPhoto by remember { mutableStateOf(false) }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Badge(containerColor = Color(0xFFD32F2F), contentColor = Color.White) {
-                                    Text("Hari ke-${log.ageDays}")
+                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Badge(containerColor = Color(0xFFD32F2F), contentColor = Color.White) {
+                                        Text("Hari ke-${log.ageDays}")
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(log.date, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(log.date, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Penyebab: ${log.cause} | Blok: ${log.locationBlock.ifEmpty { "Kandang Utama" }}", fontSize = 12.sp, color = Color.DarkGray)
+                                if (log.notes.isNotEmpty()) {
+                                    Text("Catatan: ${log.notes}", fontSize = 11.sp, color = Color.Gray)
+                                }
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Penyebab: ${log.cause} | Blok: ${log.locationBlock.ifEmpty { "Kandang Utama" }}", fontSize = 12.sp, color = Color.DarkGray)
-                            if (log.notes.isNotEmpty()) {
-                                Text("Catatan: ${log.notes}", fontSize = 11.sp, color = Color.Gray)
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${log.count} Ekor",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFD32F2F),
+                                    fontSize = 16.sp
+                                )
+                                IconButton(onClick = { deleteCandidate = log }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color.LightGray)
+                                }
                             }
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "${log.count} Ekor",
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFFD32F2F),
-                                fontSize = 16.sp
-                            )
-                            IconButton(onClick = { deleteCandidate = log }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color.LightGray)
+                        if (log.photoUri.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFE8F5E9))
+                                    .clickable { showFullPhoto = true }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Image, contentDescription = null, tint = FarmGreenPrimary, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Lihat Bukti Foto", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
                             }
                         }
                     }
+                }
+
+                if (showFullPhoto && log.photoUri.isNotBlank()) {
+                    val bitmap = remember(log.photoUri) { com.example.util.PhotoStorageHelper.loadBitmapSafe(context, log.photoUri, maxDim = 800) }
+                    AlertDialog(
+                        onDismissRequest = { showFullPhoto = false },
+                        title = { Text("Bukti Foto Kematian Ayam", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "Bukti Foto",
+                                        modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    Text("Foto tersimpan di: ${log.photoUri}", fontSize = 12.sp)
+                                }
+                                Text("${log.date} - ${log.count} Ekor (${log.cause})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showFullPhoto = false }) { Text("Tutup") }
+                        }
+                    )
                 }
             }
         }
@@ -246,7 +300,10 @@ fun MortalityScreen(
             onDismissRequest = { showAddDialog = false },
             title = { Text("Catat Kematian Ayam", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     if (formError.isNotEmpty()) {
                         Text(formError, color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
@@ -263,7 +320,7 @@ fun MortalityScreen(
                             onValueChange = { ageStr = it },
                             label = { Text("Umur (Hari)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(0.8f).testTag("input_mortality_age")
+                            modifier = Modifier.weight(0.7f).testTag("input_mortality_age")
                         )
                     }
 
@@ -289,12 +346,14 @@ fun MortalityScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                                        PhotoProofPicker(
+                    PhotoProofPicker(
                         initialPath = photoPath,
-                        onPathChanged = { photoPath = it }
+                        onPathChanged = { photoPath = it },
+                        feature = "mortalitas",
+                        title = "Bukti Foto Ayam Mati / Nekropsi"
                     )
 
-OutlinedTextField(
+                    OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
                         label = { Text("Keterangan Tambahan") },

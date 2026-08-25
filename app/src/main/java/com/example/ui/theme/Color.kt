@@ -4,9 +4,11 @@ import androidx.compose.ui.graphics.Color
 
 val FarmGreenPrimary = Color(0xFF1B5E20)
 val FarmGreenSecondary = Color(0xFF2E7D32)
+val FarmGreenDark = Color(0xFF00390E)
 val FarmGreenLight = Color(0xFFE8F5E9)
 val FarmGold = Color(0xFFF57F17)
 val FarmGoldLight = Color(0xFFFFF8E1)
+
 
 val Green80 = Color(0xFF81C784)
 val GreenGrey80 = Color(0xFFA5D6A7)

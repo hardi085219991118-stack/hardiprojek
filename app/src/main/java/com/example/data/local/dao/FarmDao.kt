@@ -315,4 +315,39 @@ interface FarmDao {
 
     @Query("DELETE FROM report_dispatches")
     suspend fun clearDispatchHistory()
+
+    // --- FEED SCHEDULE LOGS ---
+    @Query("SELECT * FROM feed_schedule_logs WHERE cycleId = :cycleId AND date = :date ORDER BY scheduledTime ASC")
+    fun getFeedSchedulesByCycleAndDate(cycleId: Long, date: String): Flow<List<FeedScheduleLogEntity>>
+
+    @Query("SELECT * FROM feed_schedule_logs WHERE cycleId = :cycleId AND date = :date ORDER BY scheduledTime ASC")
+    suspend fun getFeedSchedulesByCycleAndDateDirect(cycleId: Long, date: String): List<FeedScheduleLogEntity>
+
+    @Query("SELECT * FROM feed_schedule_logs WHERE cycleId = :cycleId ORDER BY date DESC, scheduledTime DESC")
+    fun getAllFeedSchedulesByCycle(cycleId: Long): Flow<List<FeedScheduleLogEntity>>
+
+    @Query("SELECT * FROM feed_schedule_logs WHERE cycleId = :cycleId ORDER BY date DESC, scheduledTime DESC")
+    suspend fun getAllFeedSchedulesByCycleDirect(cycleId: Long): List<FeedScheduleLogEntity>
+
+    @Query("SELECT * FROM feed_schedule_logs WHERE id = :id LIMIT 1")
+    suspend fun getFeedScheduleById(id: Long): FeedScheduleLogEntity?
+
+    @Query("SELECT * FROM feed_schedule_logs WHERE cycleId = :cycleId AND date = :date AND scheduledTime = :time LIMIT 1")
+    suspend fun getFeedScheduleBySlot(cycleId: Long, date: String, time: String): FeedScheduleLogEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFeedSchedule(schedule: FeedScheduleLogEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFeedSchedules(schedules: List<FeedScheduleLogEntity>): List<Long>
+
+    @Update
+    suspend fun updateFeedSchedule(schedule: FeedScheduleLogEntity)
+
+    @Delete
+    suspend fun deleteFeedSchedule(schedule: FeedScheduleLogEntity)
+
+    @Query("DELETE FROM feed_schedule_logs WHERE cycleId = :cycleId")
+    suspend fun clearFeedSchedulesByCycle(cycleId: Long)
 }
+

@@ -2,10 +2,10 @@ package com.example.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.ui.draw.paint
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,9 +14,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.FarmViewModel
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.FormatHelper
 import com.example.util.PdfReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,10 +57,25 @@ fun ReportsPdfScreen(
     val photos by viewModel.photos.collectAsState()
     val summary by viewModel.dashboardSummary.collectAsState()
 
-    var selectedReportType by remember { mutableStateOf(0) } // 0: Daily, 1: Periodic, 2: Partnership, 3: Cycle-End
+    var selectedReportType by remember { mutableIntStateOf(0) }
     var isGenerating by remember { mutableStateOf(false) }
     var generatedFile by remember { mutableStateOf<File?>(null) }
     var statusMessage by remember { mutableStateOf("") }
+
+    val reportOptions = listOf(
+        ReportOption(0, "Laporan Harian Kandang", "Catatan rinci populasi, kematian, pakan harian, suhu & OVK hari ini.", Icons.Default.Today, "tab_report_daily"),
+        ReportOption(1, "Laporan Periodik Pemeliharaan", "Tabel ringkasan kumulatif perkembangan harian (Landscape A4).", Icons.Default.DateRange, "tab_report_periodic"),
+        ReportOption(2, "Laporan Kemitraan & Rekonsiliasi", "Laporan formal ditujukan ke Perusahaan Mitra / TS Lapangan.", Icons.Default.Business, "tab_report_partnership"),
+        ReportOption(3, "Laporan Akhir Siklus (Tutup Buku)", "19 Parameter audit lengkap, FCR, IP, Mortalitas, Panen & Laba Bersih.", Icons.Default.WorkspacePremium, "tab_report_cycle_end"),
+        ReportOption(4, "Laporan Data & Profil Kandang", "Spesifikasi teknis kandang, kapasitas, dimensi & foto fisik kandang.", Icons.Default.HomeWork, "tab_report_coop"),
+        ReportOption(5, "Laporan Keuangan & Kas Kandang", "Buku kas operasional, nota/kuitansi pembelian & bukti foto kas.", Icons.Default.ReceiptLong, "tab_report_expense"),
+        ReportOption(6, "Laporan Mortalitas & Afkir", "Rekap kematian, afkir, gejala klinis & bukti foto bangkai/nekropsi.", Icons.Default.HeartBroken, "tab_report_mortality"),
+        ReportOption(7, "Laporan Penerimaan & Penggunaan Pakan", "Mutasi sak & kg pakan, nomor DO surat jalan & foto pakan.", Icons.Default.Grain, "tab_report_feed"),
+        ReportOption(8, "Laporan Obat, Vaksin & Vitamin", "Jadwal OVK, dosis, rute aplikasi & dokumentasi foto kemasan.", Icons.Default.Medication, "tab_report_medicine"),
+        ReportOption(9, "Laporan Sampling Bobot Ayam", "Histori sampling gram bobot mingguan, keseragaman & foto timbangan.", Icons.Default.Scale, "tab_report_weight"),
+        ReportOption(10, "Laporan Penjualan & Panen", "Realisasi tonase, ekor panen, harga jual, nomor DO & foto timbangan.", Icons.Default.LocalShipping, "tab_report_harvest"),
+        ReportOption(11, "Dokumentasi Foto Bukti Lapangan", "Arsip lengkap seluruh foto bukti terwatermark GPS & tanggal.", Icons.Default.PhotoLibrary, "tab_report_photo_doc")
+    )
 
     Scaffold(
         topBar = {
@@ -95,8 +112,8 @@ fun ReportsPdfScreen(
                         Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = FarmGreenPrimary, modifier = Modifier.size(36.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text("Generator Dokumen PDF Standar Kemitraan", fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
-                            Text("Dilengkapi Kop Surat Resmi SEJAHTERA BERSAMA, Slogan, Format Standar, & Kolom Tanda Tangan.", fontSize = 12.sp, color = Color.DarkGray)
+                            Text("Generator Dokumen PDF Standar Kemitraan A4", fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
+                            Text("Dilengkapi Kop Resmi SEJAHTERA BERSAMA, Format Rupiah Indonesia, Lampiran Foto Bukti & Tanda Tangan.", fontSize = 12.sp, color = Color.DarkGray)
                         }
                     }
                 }
@@ -104,7 +121,7 @@ fun ReportsPdfScreen(
 
             item {
                 Text(
-                    text = "PILIH JENIS LAPORAN PDF",
+                    text = "PILIH LAPORAN PDF SPESIFIK FITUR",
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = FarmGreenPrimary
@@ -112,43 +129,19 @@ fun ReportsPdfScreen(
                 )
             }
 
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReportTypeCard(
-                        title = "1. Laporan Harian Kandang",
-                        subtitle = "Catatan rinci populasi, kematian, pakan harian, suhu & OVK hari ini.",
-                        icon = Icons.Default.Today,
-                        isSelected = selectedReportType == 0,
-                        tag = "tab_report_daily"
-                    ) { selectedReportType = 0 }
-
-                    ReportTypeCard(
-                        title = "2. Laporan Periodik Pemeliharaan",
-                        subtitle = "Ringkasan kumulatif mingguan / 14 hari / 30 hari pemeliharaan.",
-                        icon = Icons.Default.DateRange,
-                        isSelected = selectedReportType == 1,
-                        tag = "tab_report_periodic"
-                    ) { selectedReportType = 1 }
-
-                    ReportTypeCard(
-                        title = "3. Laporan Kemitraan & Rekonsiliasi",
-                        subtitle = "Laporan formal ditujukan ke Perusahaan Mitra / TS Lapangan.",
-                        icon = Icons.Default.Business,
-                        isSelected = selectedReportType == 2,
-                        tag = "tab_report_partnership"
-                    ) { selectedReportType = 2 }
-
-                    ReportTypeCard(
-                        title = "4. Laporan Akhir Siklus (Tutup Buku)",
-                        subtitle = "19 Parameter audit lengkap, FCR, IP, Mortalitas, Panen & Laba Bersih.",
-                        icon = Icons.Default.WorkspacePremium,
-                        isSelected = selectedReportType == 3,
-                        tag = "tab_report_cycle_end"
-                    ) { selectedReportType = 3 }
+            items(reportOptions) { opt ->
+                ReportTypeCard(
+                    title = "${opt.id + 1}. ${opt.title}",
+                    subtitle = opt.subtitle,
+                    icon = opt.icon,
+                    isSelected = selectedReportType == opt.id,
+                    tag = opt.tag
+                ) {
+                    selectedReportType = opt.id
                 }
             }
 
-            // Summary of active target
+            // Summary Parameter Box
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -157,10 +150,10 @@ fun ReportsPdfScreen(
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text("Parameter Laporan yang Akan Digenerate:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.DarkGray)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("• Siklus: ${currentCycle?.cycleNumber ?: "-"}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text("• Kandang: ${currentCoop?.name ?: "-"} (${currentCoop?.address ?: "-"})", fontSize = 12.sp)
+                        Text("• Siklus: ${currentCycle?.cycleNumber ?: "Semua Siklus"}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("• Kandang: ${currentCoop?.name ?: "Semua Kandang"} (${currentCoop?.address ?: "-"})", fontSize = 12.sp)
                         Text("• Mitra: ${currentPartner?.companyName ?: "-"}", fontSize = 12.sp)
-                        Text("• Populasi Terkini: ${summary.currentPop} Ekor | Umur: Hari ke-${summary.ageDays}", fontSize = 12.sp)
+                        Text("• Populasi Terkini: ${FormatHelper.formatEkor(summary.currentPop)} | Umur: ${FormatHelper.formatHari(summary.ageDays)}", fontSize = 12.sp)
                     }
                 }
             }
@@ -181,37 +174,66 @@ fun ReportsPdfScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
                         onClick = {
-                            if (currentCycle == null || currentCoop == null || farmProfile == null) {
-                                Toast.makeText(context, "Data siklus/kandang belum lengkap.", Toast.LENGTH_SHORT).show()
+                            val profile = farmProfile
+                            if (profile == null) {
+                                Toast.makeText(context, "Profil usaha belum lengkap. Buka menu Profil Farm.", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             isGenerating = true
-                            statusMessage = "Sedang membuat dokumen PDF..."
+                            statusMessage = "Sedang menyusun dokumen PDF & memproses foto bukti..."
 
                             coroutineScope.launch {
                                 val file = try {
-                                    val cycle = currentCycle ?: throw IllegalStateException("Siklus aktif tidak tersedia.")
-                                    val coop = currentCoop ?: throw IllegalStateException("Data kandang tidak tersedia.")
+                                    val cycle = currentCycle
+                                    val coop = currentCoop
                                     val partner = currentPartner
-                                    val profile = farmProfile ?: throw IllegalStateException("Profil usaha tidak tersedia.")
 
                                     withContext(Dispatchers.IO) {
                                         when (selectedReportType) {
-                                        0 -> {
-                                            val log = dailyLogs.lastOrNull() ?: return@withContext null
-                                            PdfReportGenerator.generateDailyReportPdf(context, profile, coop, partner, cycle, log, mortalityLogs, feedStocks, medicines, photos)
-                                        }
-                                        1 -> {
-                                            PdfReportGenerator.generatePeriodReportPdf(context, profile, coop, cycle, dailyLogs, photos, "Perkembangan Harian Lengkap")
-                                        }
-                                        2 -> {
-                                            PdfReportGenerator.generatePartnershipReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
-                                        }
-                                        else -> {
-                                            PdfReportGenerator.generateCycleEndReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
+                                            0 -> {
+                                                val log = dailyLogs.lastOrNull() ?: return@withContext null
+                                                if (cycle == null) return@withContext null
+                                                PdfReportGenerator.generateDailyReportPdf(context, profile, coop, partner, cycle, log, mortalityLogs, feedStocks, medicines, photos)
+                                            }
+                                            1 -> {
+                                                if (cycle == null) return@withContext null
+                                                PdfReportGenerator.generatePeriodReportPdf(context, profile, coop, cycle, dailyLogs, photos, "Perkembangan Harian Lengkap")
+                                            }
+                                            2 -> {
+                                                if (cycle == null) return@withContext null
+                                                PdfReportGenerator.generatePartnershipReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
+                                            }
+                                            3 -> {
+                                                if (cycle == null) return@withContext null
+                                                PdfReportGenerator.generateCycleEndReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
+                                            }
+                                            4 -> {
+                                                val targetCoop = coop ?: return@withContext null
+                                                PdfReportGenerator.generateCoopPdf(context, profile, targetCoop, photos)
+                                            }
+                                            5 -> {
+                                                PdfReportGenerator.generateExpensePdf(context, profile, coop, cycle, expenses, photos)
+                                            }
+                                            6 -> {
+                                                PdfReportGenerator.generateMortalityPdf(context, profile, coop, cycle, mortalityLogs, photos)
+                                            }
+                                            7 -> {
+                                                PdfReportGenerator.generateFeedPdf(context, profile, coop, cycle, feedStocks, photos)
+                                            }
+                                            8 -> {
+                                                PdfReportGenerator.generateMedicinePdf(context, profile, coop, cycle, medicines, photos)
+                                            }
+                                            9 -> {
+                                                PdfReportGenerator.generateWeightPdf(context, profile, coop, cycle, weightSamples, photos)
+                                            }
+                                            10 -> {
+                                                PdfReportGenerator.generateHarvestPdf(context, profile, coop, partner, cycle, harvests, photos)
+                                            }
+                                            else -> {
+                                                PdfReportGenerator.generatePhotoEvidencePdf(context, profile, coop, cycle, photos)
+                                            }
                                         }
                                     }
-                                }
                                 } catch (e: Exception) {
                                     statusMessage = "Gagal membuat PDF: ${e.localizedMessage ?: "kesalahan tidak diketahui"}"
                                     null
@@ -219,10 +241,10 @@ fun ReportsPdfScreen(
                                 isGenerating = false
                                 generatedFile = file
                                 if (file != null) {
-                                    statusMessage = "PDF Berhasil dibuat: ${file.name}"
+                                    statusMessage = "PDF Berhasil disimpan: ${file.name}"
                                     PdfReportGenerator.openPdf(context, file)
                                 } else {
-                                    statusMessage = "Gagal membuat PDF."
+                                    statusMessage = "Gagal membuat PDF. Pastikan data siklus / kandang aktif tersedia."
                                 }
                             }
                         },
@@ -235,7 +257,7 @@ fun ReportsPdfScreen(
                         if (isGenerating) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Memproses PDF...")
+                            Text("Menyusun PDF...")
                         } else {
                             Icon(Icons.Default.Visibility, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -249,28 +271,35 @@ fun ReportsPdfScreen(
                             if (readyFile != null && readyFile.exists()) {
                                 PdfReportGenerator.sharePdf(context, readyFile)
                             } else {
-                                if (currentCycle == null || currentCoop == null || farmProfile == null) return@OutlinedButton
+                                val profile = farmProfile ?: return@OutlinedButton
                                 coroutineScope.launch {
                                     isGenerating = true
                                     val file = try {
-                                        val cycle = currentCycle ?: throw IllegalStateException("Siklus aktif tidak tersedia.")
-                                        val coop = currentCoop ?: throw IllegalStateException("Data kandang tidak tersedia.")
+                                        val cycle = currentCycle
+                                        val coop = currentCoop
                                         val partner = currentPartner
-                                        val profile = farmProfile ?: throw IllegalStateException("Profil usaha tidak tersedia.")
 
                                         withContext(Dispatchers.IO) {
                                             when (selectedReportType) {
-                                            0 -> {
-                                                val log = dailyLogs.lastOrNull() ?: return@withContext null
-                                                PdfReportGenerator.generateDailyReportPdf(context, profile, coop, partner, cycle, log, mortalityLogs, feedStocks, medicines, photos)
-                                            }
-                                            1 -> PdfReportGenerator.generatePeriodReportPdf(context, profile, coop, cycle, dailyLogs, photos, "Perkembangan Harian Lengkap")
-                                            2 -> PdfReportGenerator.generatePartnershipReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
-                                            else -> PdfReportGenerator.generateCycleEndReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
+                                                0 -> {
+                                                    val log = dailyLogs.lastOrNull() ?: return@withContext null
+                                                    if (cycle == null) return@withContext null
+                                                    PdfReportGenerator.generateDailyReportPdf(context, profile, coop, partner, cycle, log, mortalityLogs, feedStocks, medicines, photos)
+                                                }
+                                                1 -> if (cycle != null) PdfReportGenerator.generatePeriodReportPdf(context, profile, coop, cycle, dailyLogs, photos) else null
+                                                2 -> if (cycle != null) PdfReportGenerator.generatePartnershipReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos) else null
+                                                3 -> if (cycle != null) PdfReportGenerator.generateCycleEndReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos) else null
+                                                4 -> if (coop != null) PdfReportGenerator.generateCoopPdf(context, profile, coop, photos) else null
+                                                5 -> PdfReportGenerator.generateExpensePdf(context, profile, coop, cycle, expenses, photos)
+                                                6 -> PdfReportGenerator.generateMortalityPdf(context, profile, coop, cycle, mortalityLogs, photos)
+                                                7 -> PdfReportGenerator.generateFeedPdf(context, profile, coop, cycle, feedStocks, photos)
+                                                8 -> PdfReportGenerator.generateMedicinePdf(context, profile, coop, cycle, medicines, photos)
+                                                9 -> PdfReportGenerator.generateWeightPdf(context, profile, coop, cycle, weightSamples, photos)
+                                                10 -> PdfReportGenerator.generateHarvestPdf(context, profile, coop, partner, cycle, harvests, photos)
+                                                else -> PdfReportGenerator.generatePhotoEvidencePdf(context, profile, coop, cycle, photos)
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        statusMessage = "Gagal membuat PDF: ${e.localizedMessage ?: "kesalahan tidak diketahui"}"
                                         null
                                     }
                                     isGenerating = false
@@ -292,136 +321,20 @@ fun ReportsPdfScreen(
                     }
                 }
             }
-
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "FORMULIR INPUT DATA OPERASIONAL",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = FarmGreenPrimary
-                    )
-                )
-                Text(
-                    text = "Laporan PDF terisi otomatis berdasarkan input data pada modul operasional berikut:",
-                    fontSize = 12.sp,
-                    color = Color.DarkGray
-                )
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ReportInputShortcutRow(
-                            title = "Penimbangan Bobot Ayam (Sampling)",
-                            subtitle = "${weightSamples.size} kali penimbangan tercatat",
-                            icon = Icons.Default.Scale,
-                            buttonText = "+ Input Bobot",
-                            onClick = { onNavigate("weight") }
-                        )
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        ReportInputShortcutRow(
-                            title = "Laporan Harian Kandang",
-                            subtitle = "${dailyLogs.size} hari log operasional",
-                            icon = Icons.Default.EditCalendar,
-                            buttonText = "+ Input Harian",
-                            onClick = { onNavigate("daily_log") }
-                        )
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        ReportInputShortcutRow(
-                            title = "Pencatatan Stok & Mutasi Pakan",
-                            subtitle = "${feedStocks.size} transaksi penerimaan/pengeluaran",
-                            icon = Icons.Default.Inventory2,
-                            buttonText = "+ Input Pakan",
-                            onClick = { onNavigate("feed") }
-                        )
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        ReportInputShortcutRow(
-                            title = "Mortalitas & Kematian Ayam",
-                            subtitle = "${mortalityLogs.size} catatan kematian",
-                            icon = Icons.Default.Favorite,
-                            buttonText = "+ Catat Mati",
-                            onClick = { onNavigate("mortality") }
-                        )
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        ReportInputShortcutRow(
-                            title = "Obat, Vitamin, Vaksin (OVK)",
-                            subtitle = "${medicines.size} dokumentasi medis",
-                            icon = Icons.Default.Vaccines,
-                            buttonText = "+ Input OVK",
-                            onClick = { onNavigate("medicine") }
-                        )
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        ReportInputShortcutRow(
-                            title = "Pencatatan Panen & Penjualan",
-                            subtitle = "${harvests.size} surat jalan / rit panen",
-                            icon = Icons.Default.LocalShipping,
-                            buttonText = "+ Input Panen",
-                            onClick = { onNavigate("harvest") }
-                        )
-                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                        ReportInputShortcutRow(
-                            title = "Biaya Operasional Kandang",
-                            subtitle = "${expenses.size} pos pengeluaran",
-                            icon = Icons.Default.ReceiptLong,
-                            buttonText = "+ Input Biaya",
-                            onClick = { onNavigate("expenses") }
-                        )
-                    }
-                }
-            }
         }
     }
 }
 
-@Composable
-fun ReportInputShortcutRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    buttonText: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = FarmGreenPrimary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text(subtitle, fontSize = 11.sp, color = Color.DarkGray)
-            }
-        }
-        FilledTonalButton(
-            onClick = onClick,
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-            modifier = Modifier.height(34.dp)
-        ) {
-            Text(buttonText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
+private data class ReportOption(
+    val id: Int,
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val tag: String
+)
 
 @Composable
-fun ReportTypeCard(
+private fun ReportTypeCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
@@ -434,45 +347,44 @@ fun ReportTypeCard(
             .fillMaxWidth()
             .clickable { onClick() }
             .testTag(tag),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) FarmGreenPrimary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
         ),
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, FarmGreenPrimary) else null,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = if (isSelected) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(FarmGreenPrimary), width = 2.dp) else null
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RadioButton(
-                selected = isSelected,
-                onClick = onClick,
-                colors = RadioButtonDefaults.colors(selectedColor = FarmGreenPrimary)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) FarmGreenPrimary else Color.Gray,
+                modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = if (isSelected) FarmGreenPrimary else Color.Black
+                    color = if (isSelected) FarmGreenPrimary else Color.Unspecified
                 )
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    fontSize = 11.sp,
+                    fontSize = 11.5.sp,
                     color = Color.DarkGray
                 )
             }
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) FarmGreenPrimary else Color.Gray,
-                modifier = Modifier.size(24.dp)
-            )
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = FarmGreenPrimary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }

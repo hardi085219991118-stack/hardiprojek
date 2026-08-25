@@ -129,6 +129,19 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         if (cycle != null) repository.getPhotos(cycle.id) else flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val todayDateString = MutableStateFlow(com.example.alarm.FeedGuideRules.getTodayDateString())
+
+    val todayFeedSchedules: StateFlow<List<FeedScheduleLogEntity>> = combine(currentCycle, todayDateString) { cycle, date ->
+        cycle to date
+    }.flatMapLatest { (cycle, date) ->
+        if (cycle != null) repository.getFeedSchedulesByDate(cycle.id, date) else flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allFeedSchedules: StateFlow<List<FeedScheduleLogEntity>> = currentCycle.flatMapLatest { cycle ->
+        if (cycle != null) repository.getAllFeedSchedules(cycle.id) else flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+
     val dashboardSummary: StateFlow<DashboardSummary> = combine(
         currentCycle, currentCoop, currentPartner, dailyLogs, mortalityLogs,
         feedStocks, weightSamples, expenses, harvests
@@ -269,7 +282,195 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun saveHarvest(harvest: HarvestEntity, onComplete: () -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) { repository.insertHarvest(harvest); onComplete() }
     fun deleteHarvest(harvest: HarvestEntity) = viewModelScope.launch(Dispatchers.IO) { repository.deleteHarvest(harvest) }
 
+    // --- FEED SCHEDULE & ALARM MANAGEMENT ---
+
+    /**
+     * Memastikan 4 slot jadwal standar (06:00, 11:00, 16:00, 20:00) dari Bab 4 PDF telah terdaftar untuk hari ini.
+     */
+    fun ensureTodayFeedSchedules() = viewModelScope.launch(Dispatchers.IO) {
+        val cycle = currentCycle.value ?: return@launch
+        val today = com.example.alarm.FeedGuideRules.getTodayDateString()
+        val existing = repository.getFeedSchedulesByDateDirect(cycle.id, today)
+        val ageDays = com.example.alarm.FeedGuideRules.calculateAgeDays(cycle.chickInDate)
+        val phaseDetail = com.example.alarm.FeedGuideRules.getPhaseDetailForAge(ageDays)
+
+        val existingSlots = existing.map { it.scheduledTime }.toSet()
+        val newSchedules = mutableListOf<FeedScheduleLogEntity>()
+        val now = System.currentTimeMillis()
+
+        com.example.alarm.FeedGuideRules.STANDARD_SLOTS.forEach { slot ->
+            if (!existingSlots.contains(slot.time)) {
+                newSchedules.add(
+                    FeedScheduleLogEntity(
+                        userId = scopedUserId(),
+                        cycleId = cycle.id,
+                        coopId = cycle.coopId,
+                        date = today,
+                        scheduledTime = slot.time,
+                        slotName = slot.slotName,
+                        instruction = slot.taskInstruction,
+                        actualTime = "",
+                        ageDays = ageDays,
+                        phase = phaseDetail.phaseName,
+                        feedType = phaseDetail.feedType,
+                        status = "BELUM",
+                        feedAmountKg = 0.0,
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                )
+            }
+        }
+
+        if (newSchedules.isNotEmpty()) {
+            repository.insertFeedSchedules(newSchedules)
+        }
+
+        // Sinkronisasi alarm di sistem Android
+        val coop = currentCoop.value
+        com.example.alarm.FeedAlarmScheduler.scheduleAllDailySlots(
+            context = getApplication(),
+            cycleId = cycle.id,
+            coopId = cycle.coopId,
+            coopName = coop?.name ?: "Kandang Broiler",
+            ageDays = ageDays
+        )
+    }
+
+    /**
+     * Update status jadwal secara manual di UI (Selesai / Tunda / Lewati).
+     */
+    fun updateFeedScheduleStatus(
+        schedule: FeedScheduleLogEntity,
+        newStatus: String,
+        snoozeMinutes: Int = 0,
+        feedAmountKg: Double = schedule.feedAmountKg,
+        notes: String = schedule.notes
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val actualTime = if (newStatus == "SELESAI" && schedule.actualTime.isBlank()) {
+            com.example.alarm.FeedGuideRules.getCurrentTimeString()
+        } else schedule.actualTime
+
+        val snoozeEpoch = if (newStatus == "DITUNDA") {
+            now + (snoozeMinutes * 60 * 1000L)
+        } else 0L
+
+        val updated = schedule.copy(
+            status = newStatus,
+            actualTime = actualTime,
+            snoozeMinutes = snoozeMinutes,
+            snoozeUntilEpoch = snoozeEpoch,
+            feedAmountKg = feedAmountKg,
+            notes = notes,
+            updatedAt = now
+        )
+        repository.updateFeedSchedule(updated)
+
+        if (newStatus == "DITUNDA") {
+            val coop = currentCoop.value
+            com.example.alarm.FeedAlarmScheduler.scheduleSnooze(
+                context = getApplication(),
+                scheduleId = schedule.id,
+                cycleId = schedule.cycleId,
+                coopId = schedule.coopId,
+                coopName = coop?.name ?: "Kandang Broiler",
+                timeStr = schedule.scheduledTime,
+                slotName = schedule.slotName,
+                instruction = schedule.instruction,
+                ageDays = schedule.ageDays,
+                phase = schedule.phase,
+                feedType = schedule.feedType,
+                snoozeMinutes = snoozeMinutes
+            )
+        }
+    }
+
+    /**
+     * Menyimpan transaksi pakan keluar (terpakai), update log harian, dan otomatis menandai jadwal pakan SELESAI.
+     */
+    fun recordFeedingAndCompleteSchedule(
+        schedule: FeedScheduleLogEntity,
+        bags: Double,
+        kgPerBag: Double,
+        feedType: String,
+        notes: String,
+        photoPath: String = "",
+        onComplete: () -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val cycle = currentCycle.value ?: return@launch
+        val totalKg = bags * kgPerBag
+        val today = schedule.date
+        val now = System.currentTimeMillis()
+        val actualTime = com.example.alarm.FeedGuideRules.getCurrentTimeString()
+
+        // 1. Simpan FeedStockEntity (Movement OUT)
+        val feedStock = FeedStockEntity(
+            cycleId = cycle.id,
+            coopId = cycle.coopId,
+            date = today,
+            movementType = "OUT",
+            feedType = feedType,
+            feedCode = "",
+            bags = bags,
+            kgPerBag = kgPerBag,
+            totalKg = totalKg,
+            doNumber = "",
+            supplier = "",
+            pricePerBag = 0.0,
+            totalPrice = 0.0,
+            notes = "Jadwal ${schedule.slotName} (${schedule.scheduledTime}): $notes".trim(),
+            photoUri = photoPath
+        )
+        repository.insertFeedStock(feedStock)
+
+        // 2. Update status jadwal pakan menjadi SELESAI
+        val updatedSchedule = schedule.copy(
+            status = "SELESAI",
+            actualTime = actualTime,
+            feedAmountKg = totalKg,
+            notes = notes,
+            feedType = feedType,
+            updatedAt = now
+        )
+        repository.updateFeedSchedule(updatedSchedule)
+
+        // 3. Update / Insert DailyLogEntity untuk akumulasi pakan hari ini
+        val existingDailyLog = repository.getDailyLogByDate(cycle.id, today)
+        if (existingDailyLog != null) {
+            val newFeedGiven = existingDailyLog.feedGivenKg + totalKg
+            val newBagsGiven = existingDailyLog.feedGivenBags + bags
+            repository.saveDailyLog(
+                existingDailyLog.copy(
+                    feedGivenKg = newFeedGiven,
+                    feedGivenBags = newBagsGiven,
+                    notes = if (existingDailyLog.notes.isBlank()) notes else "${existingDailyLog.notes} | $notes",
+                    updatedAt = now
+                )
+            )
+        } else {
+            repository.saveDailyLog(
+                DailyLogEntity(
+                    cycleId = cycle.id,
+                    date = today,
+                    ageDays = schedule.ageDays,
+                    feedGivenKg = totalKg,
+                    feedGivenBags = bags,
+                    notes = notes,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        }
+
+
+        withContext(Dispatchers.Main) {
+            onComplete()
+        }
+    }
+
     fun saveFarmProfile(
+
         profile: FarmProfileEntity,
         onComplete: () -> Unit = {},
         onError: (String) -> Unit = {}

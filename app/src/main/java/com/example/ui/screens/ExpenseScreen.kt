@@ -1,10 +1,15 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -13,15 +18,19 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +44,7 @@ import com.example.data.local.entity.ExpenseEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.PhotoStorageHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -308,29 +318,75 @@ private fun EmptyFinanceCard(isIncome: Boolean, onAdd: () -> Unit) {
 private fun FinanceTransactionCard(item: ExpenseEntity, formatter: NumberFormat, onDelete: () -> Unit) {
     val isIncome = item.transactionType == TYPE_IN
     val accent = if (isIncome) Color(0xFF2E7D32) else Color(0xFFC62828)
+    val context = LocalContext.current
+    var showFullPhoto by remember { mutableStateOf(false) }
+
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), elevation = CardDefaults.cardElevation(2.dp)) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                if (isIncome) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.expenseName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                if (item.category.isNotBlank()) Text(item.category, fontSize = 11.sp, color = accent, fontWeight = FontWeight.Bold)
-                Text("Tanggal: ${item.date}", fontSize = 12.sp, color = Color.DarkGray)
-                if (item.notes.isNotBlank()) Text("Keterangan: ${item.notes}", fontSize = 11.sp, color = Color.Gray)
-                if (item.photoUri.isNotBlank()) Text("📷 Bukti foto tersimpan", fontSize = 11.sp, color = FarmGreenPrimary)
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (isIncome) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(item.expenseName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    if (item.category.isNotBlank()) Text(item.category, fontSize = 11.sp, color = accent, fontWeight = FontWeight.Bold)
+                    Text("Tanggal: ${item.date}", fontSize = 12.sp, color = Color.DarkGray)
+                    if (item.notes.isNotBlank()) Text("Keterangan: ${item.notes}", fontSize = 11.sp, color = Color.Gray)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(formatter.format(item.totalAmount), fontWeight = FontWeight.ExtraBold, color = accent, fontSize = 14.sp)
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color.LightGray)
+                    }
+                }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(formatter.format(item.totalAmount), fontWeight = FontWeight.ExtraBold, color = accent, fontSize = 14.sp)
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color.LightGray)
+
+            if (item.photoUri.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFFE8F5E9))
+                        .clickable { showFullPhoto = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null, tint = FarmGreenPrimary, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Lihat Bukti Foto", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
                 }
             }
         }
+    }
+
+    if (showFullPhoto && item.photoUri.isNotBlank()) {
+        val bitmap = remember(item.photoUri) { PhotoStorageHelper.loadBitmapSafe(context, item.photoUri, maxDim = 800) }
+        AlertDialog(
+            onDismissRequest = { showFullPhoto = false },
+            title = { Text("Bukti Foto Transaksi", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Bukti Foto",
+                            modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Text("Foto tersimpan di: ${item.photoUri}", fontSize = 12.sp)
+                    }
+                    Text("${item.expenseName} - ${formatter.format(item.totalAmount)}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFullPhoto = false }) { Text("Tutup") }
+            }
+        )
     }
 }
 
@@ -357,7 +413,10 @@ private fun FinanceEntryDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
                 if (formError.isNotBlank()) Text(formError, color = Color(0xFFC62828), fontSize = 12.sp, fontWeight = FontWeight.Bold)
 
                 OutlinedTextField(
@@ -397,9 +456,12 @@ private fun FinanceEntryDialog(
                     modifier = Modifier.fillMaxWidth().testTag("input_finance_notes")
                 )
 
-                Text("Bukti foto", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
-                Text("Gunakan kamera atau pilih foto dari galeri.", fontSize = 11.sp, color = Color.Gray)
-                PhotoProofPicker(initialPath = photoPath, onPathChanged = { photoPath = it })
+                PhotoProofPicker(
+                    initialPath = photoPath,
+                    onPathChanged = { photoPath = it },
+                    feature = "keuangan",
+                    title = "Bukti Foto Nota / Kuitansi"
+                )
             }
         },
         confirmButton = {

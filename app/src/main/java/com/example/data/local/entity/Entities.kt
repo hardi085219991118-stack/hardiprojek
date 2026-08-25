@@ -289,3 +289,28 @@ data class FarmProfileEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "feed_schedule_logs")
+data class FeedScheduleLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val userId: Long = 0,
+    val cycleId: Long = 0,
+    val coopId: Long = 0,
+    val date: String,                  // YYYY-MM-DD
+    val scheduledTime: String,         // "06:00", "11:00", "16:00", "20:00"
+    val slotName: String = "",         // "Pagi", "Siang", "Sore", "Malam"
+    val instruction: String = "",      // Instruksi resmi Bab 4 PDF
+    val actualTime: String = "",       // Jam aktual saat ditandai/dicatat (HH:mm)
+    val ageDays: Int = 0,              // Umur ayam hari ini
+    val phase: String = "",            // Pre-Starter / Starter / Finisher
+    val feedType: String = "",         // Jenis pakan panduan
+    val status: String = "BELUM",      // "SELESAI", "DITUNDA", "DILEWATI", "BELUM"
+    val feedAmountKg: Double = 0.0,    // Jumlah kg pakan jika dicatat
+    val snoozeMinutes: Int = 0,
+    val snoozeUntilEpoch: Long = 0L,
+    val notes: String = "",
+    val isManual: Boolean = false,     // false = jadwal asli Bab 4 PDF, true = manual
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+

@@ -34,7 +34,9 @@ class FarmRepository(private val dao: FarmDao) {
     suspend fun updateCycle(cycle: CycleEntity) = dao.updateCycle(cycle)
     suspend fun deleteCycle(cycle: CycleEntity) = dao.deleteCycle(cycle)
     suspend fun saveDailyLog(log: DailyLogEntity): Long = if (log.id == 0L) dao.insertDailyLog(log) else { dao.updateDailyLog(log); log.id }
+    suspend fun getDailyLogByDate(cycleId: Long, date: String): DailyLogEntity? = dao.getDailyLogByDate(cycleId, date)
     suspend fun deleteDailyLog(log: DailyLogEntity) = dao.deleteDailyLog(log)
+
     suspend fun insertMortality(log: MortalityLogEntity): Long = dao.insertMortalityLog(log)
     suspend fun deleteMortality(log: MortalityLogEntity) = dao.deleteMortalityLog(log)
     suspend fun insertFeedStock(feed: FeedStockEntity): Long = dao.insertFeedStock(feed)
@@ -85,5 +87,29 @@ class FarmRepository(private val dao: FarmDao) {
         dao.getAllHarvestsDirect().filter { it.cycleId in cycleIds }.forEach { dao.deleteHarvest(it) }
         dao.getAllPhotosDirect().filter { it.userId == userId }.forEach { dao.deletePhoto(it) }
         dao.getAllDispatchHistoryDirect().filter { it.userId == userId }.forEach { dao.deleteDispatchHistory(it) }
+        cycleIds.forEach { dao.clearFeedSchedulesByCycle(it) }
     }
+
+    // Feed Schedules
+    fun getFeedSchedulesByDate(cycleId: Long, date: String): Flow<List<FeedScheduleLogEntity>> =
+        dao.getFeedSchedulesByCycleAndDate(cycleId, date)
+
+    suspend fun getFeedSchedulesByDateDirect(cycleId: Long, date: String): List<FeedScheduleLogEntity> =
+        dao.getFeedSchedulesByCycleAndDateDirect(cycleId, date)
+
+    fun getAllFeedSchedules(cycleId: Long): Flow<List<FeedScheduleLogEntity>> =
+        dao.getAllFeedSchedulesByCycle(cycleId)
+
+    suspend fun insertFeedSchedule(schedule: FeedScheduleLogEntity): Long =
+        dao.insertFeedSchedule(schedule)
+
+    suspend fun insertFeedSchedules(schedules: List<FeedScheduleLogEntity>): List<Long> =
+        dao.insertFeedSchedules(schedules)
+
+    suspend fun updateFeedSchedule(schedule: FeedScheduleLogEntity) =
+        dao.updateFeedSchedule(schedule)
+
+    suspend fun deleteFeedSchedule(schedule: FeedScheduleLogEntity) =
+        dao.deleteFeedSchedule(schedule)
 }
+

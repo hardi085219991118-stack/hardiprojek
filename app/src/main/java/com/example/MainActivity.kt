@@ -251,10 +251,23 @@ fun SejahteraBersamaApp() {
         }
 
         composable("broiler_guide") {
-            BroilerGuideScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+            BroilerGuideScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToAlarm = { navController.navigate("feed_alarm") }
+            )
+        }
+
+        composable("feed_alarm") {
+            FeedAlarmScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToCycles = { navController.navigate("cycles") }
+            )
         }
 
         composable("backup") {
+
             BackupExportScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() }

@@ -61,10 +61,34 @@ object WatermarkHelper {
                 inMutable = true
             }
 
-            var bitmap = BitmapFactory.decodeFile(sourceFile.absolutePath, decodeOptions) ?: return sourceFile
-            val mutableBitmap = if (bitmap.isMutable) bitmap else {
-                val copy = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-                bitmap.recycle()
+            val decodedRaw = BitmapFactory.decodeFile(sourceFile.absolutePath, decodeOptions) ?: return sourceFile
+
+            // Check EXIF rotation of source file
+            val orientation = try {
+                val exif = android.media.ExifInterface(sourceFile.absolutePath)
+                exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
+            } catch (e: Exception) {
+                android.media.ExifInterface.ORIENTATION_NORMAL
+            }
+
+            val matrix = Matrix()
+            when (orientation) {
+                android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+                android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+                android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            }
+
+            val orientedBitmap = if (!matrix.isIdentity) {
+                val rotated = Bitmap.createBitmap(decodedRaw, 0, 0, decodedRaw.width, decodedRaw.height, matrix, true)
+                if (rotated != decodedRaw) decodedRaw.recycle()
+                rotated
+            } else {
+                decodedRaw
+            }
+
+            val mutableBitmap = if (orientedBitmap.isMutable) orientedBitmap else {
+                val copy = orientedBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                orientedBitmap.recycle()
                 copy
             }
             val canvas = Canvas(mutableBitmap)

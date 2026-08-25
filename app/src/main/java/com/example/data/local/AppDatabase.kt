@@ -22,15 +22,45 @@ import com.example.data.local.entity.*
         MedicineEntity::class,
         ExpenseEntity::class,
         HarvestEntity::class,
-        FarmProfileEntity::class
+        FarmProfileEntity::class,
+        FeedScheduleLogEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun farmDao(): FarmDao
 
     companion object {
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `feed_schedule_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `userId` INTEGER NOT NULL,
+                        `cycleId` INTEGER NOT NULL,
+                        `coopId` INTEGER NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `scheduledTime` TEXT NOT NULL,
+                        `slotName` TEXT NOT NULL,
+                        `instruction` TEXT NOT NULL,
+                        `actualTime` TEXT NOT NULL,
+                        `ageDays` INTEGER NOT NULL,
+                        `phase` TEXT NOT NULL,
+                        `feedType` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `feedAmountKg` REAL NOT NULL,
+                        `snoozeMinutes` INTEGER NOT NULL,
+                        `snoozeUntilEpoch` INTEGER NOT NULL,
+                        `notes` TEXT NOT NULL,
+                        `isManual` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE expenses ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'OUT'")
@@ -54,7 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sejahtera_bersama_farm.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     // Prevent force-close on legacy installs when an older, unknown schema is found.
                     // Current supported migrations are still preferred; destructive fallback is only
                     // used by Room when no valid migration path exists.
@@ -66,3 +96,4 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+

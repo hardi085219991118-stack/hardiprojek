@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
@@ -31,6 +37,26 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".alarm.FeedAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.action.FEED_ALARM" />
+                <action android:name="com.example.action.FEED_STATUS_DONE" />
+                <action android:name="com.example.action.FEED_STATUS_SNOOZE" />
+                <action android:name="com.example.action.FEED_STATUS_SKIP" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".alarm.BootCompletedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -41,5 +67,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
     </application>
+
 
 </manifest>
