@@ -40,11 +40,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.ExpenseEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.FormatHelper
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -59,6 +65,7 @@ fun ExpenseScreen(
     viewModel: FarmViewModel,
     onBack: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val transactions by viewModel.expenses.collectAsState()
@@ -68,6 +75,7 @@ fun ExpenseScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var dialogType by remember { mutableStateOf(TYPE_OUT) }
     var deleteCandidate by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var processState by rememberProcessState()
 
     val idRupiah = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply { maximumFractionDigits = 0 }
     val expenses = transactions.filter { it.transactionType != TYPE_IN }
@@ -82,6 +90,11 @@ fun ExpenseScreen(
             active?.let { viewModel.selectCycle(it.id) }
         }
     }
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
 
     fun openAdd(type: String) {
         dialogType = type
@@ -200,7 +213,23 @@ fun ExpenseScreen(
             cycleId = currentCycle!!.id,
             onDismiss = { showAddDialog = false },
             onSave = { entity ->
-                viewModel.saveExpense(entity) { showAddDialog = false }
+                showAddDialog = false
+                val isIncome = entity.transactionType == TYPE_IN
+                processState = ProcessState.Processing(
+                    title = if (isIncome) "MENYIMPAN UANG MASUK" else "MENYIMPAN PENGELUARAN",
+                    message = "Sedang memvalidasi transaksi dan menyimpan bukti...",
+                    step = if (entity.photoUri.isNotBlank()) "Menyimpan foto nota & kuitansi" else "Mencatat transaksi ke buku kas"
+                )
+                coroutineScope.launch {
+                    delay(300)
+                    viewModel.saveExpense(entity) {
+                        processState = ProcessState.Success(
+                            title = "TRANSAKSI BERHASIL DISIMPAN",
+                            message = "${entity.expenseName} sebesar ${FormatHelper.formatRupiah(entity.totalAmount)} telah tercatat.",
+                            detail = "Kategori: ${entity.category} | Tanggal: ${entity.date}"
+                        )
+                    }
+                }
             }
         )
     }
@@ -212,8 +241,20 @@ fun ExpenseScreen(
             text = { Text("Hapus catatan '${candidate.expenseName}' sebesar ${idRupiah.format(candidate.totalAmount)}?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    viewModel.deleteExpense(candidate)
+                    val candidateItem = candidate
                     deleteCandidate = null
+                    processState = ProcessState.Processing(
+                        title = "MENGHAPUS TRANSAKSI",
+                        message = "Sedang menghapus catatan keuangan..."
+                    )
+                    coroutineScope.launch {
+                        delay(200)
+                        viewModel.deleteExpense(candidateItem)
+                        processState = ProcessState.Success(
+                            title = "TRANSAKSI BERHASIL DIHAPUS",
+                            message = "Catatan '${candidateItem.expenseName}' telah dihapus dari buku kas."
+                        )
+                    }
                 })
             },
             dismissButton = { TextButton(onClick = { deleteCandidate = null }) { Text("Batal") } }

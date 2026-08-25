@@ -30,10 +30,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.DailyLogEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.theme.FarmGreenPrimary
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -44,12 +49,14 @@ fun DailyLogScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val dailyLogs by viewModel.dailyLogs.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingLog by remember { mutableStateOf<DailyLogEntity?>(null) }
     var deleteCandidate by remember { mutableStateOf<DailyLogEntity?>(null) }
+    var processState by rememberProcessState()
 
     // Auto-select cycle if currentCycle is null but cycles exist
     LaunchedEffect(currentCycle, cycles) {
@@ -58,6 +65,11 @@ fun DailyLogScreen(
             active?.let { viewModel.selectCycle(it.id) }
         }
     }
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
 
     Scaffold(
         topBar = {
@@ -510,8 +522,10 @@ fun DailyLogScreen(
                 }
             },
             confirmButton = {
+                val isProcessing = processState is ProcessState.Processing
                 Button(
                     onClick = {
+                        if (isProcessing) return@Button
                         val age = ageStr.toIntOrNull() ?: 0
                         val morningPop = morningPopStr.toIntOrNull() ?: 0
                         val dead = deadStr.toIntOrNull() ?: 0
@@ -530,6 +544,13 @@ fun DailyLogScreen(
                         }
 
                         val afternoonPop = (morningPop - dead - cull - out).coerceAtLeast(0)
+
+                        val isEdit = editingLog != null
+                        processState = ProcessState.Processing(
+                            title = if (isEdit) "MENYIMPAN PERUBAHAN" else "MENYIMPAN DATA HARIAN",
+                            message = "Sedang memvalidasi dan menyimpan ke basis data...",
+                            step = if (photoPath.isNotBlank()) "Menyimpan foto bukti & log operasional" else "Menyimpan catatan operasional"
+                        )
 
                         val logToSave = DailyLogEntity(
                             id = editingLog?.id ?: 0,
@@ -557,10 +578,18 @@ fun DailyLogScreen(
                             notes = notes
                         )
 
-                        viewModel.saveDailyLog(logToSave) {
-                            showAddDialog = false
+                        coroutineScope.launch {
+                            delay(300)
+                            viewModel.saveDailyLog(logToSave) {
+                                showAddDialog = false
+                                processState = ProcessState.Success(
+                                    title = if (isEdit) "PERUBAHAN BERHASIL DISIMPAN" else "DATA HARIAN BERHASIL DISIMPAN",
+                                    message = "Laporan harian umur $age hari telah tersimpan ke sistem."
+                                )
+                            }
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = FarmGreenPrimary),
                     modifier = Modifier.testTag("btn_save_daily_log")
                 ) {
@@ -583,8 +612,22 @@ fun DailyLogScreen(
             text = { Text("Apakah Anda yakin ingin menghapus data harian umur ${deleteCandidate?.ageDays} hari?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    deleteCandidate?.let { viewModel.deleteDailyLog(it) }
+                    val candidate = deleteCandidate
                     deleteCandidate = null
+                    if (candidate != null) {
+                        processState = ProcessState.Processing(
+                            title = "MENGHAPUS DATA",
+                            message = "Sedang menghapus catatan harian..."
+                        )
+                        coroutineScope.launch {
+                            delay(200)
+                            viewModel.deleteDailyLog(candidate)
+                            processState = ProcessState.Success(
+                                title = "DATA BERHASIL DIHAPUS",
+                                message = "Catatan harian umur ${candidate.ageDays} hari telah dihapus."
+                            )
+                        }
+                    }
                 })
             },
             dismissButton = {

@@ -30,11 +30,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.FeedStockEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.FormatHelper
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -46,6 +52,7 @@ fun FeedScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val feedStocks by viewModel.feedStocks.collectAsState()
@@ -54,6 +61,7 @@ fun FeedScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedType by remember { mutableStateOf("IN") } // "IN" (Masuk) or "OUT" (Keluar)
     var deleteCandidate by remember { mutableStateOf<FeedStockEntity?>(null) }
+    var processState by rememberProcessState()
 
     val numFmt = NumberFormat.getNumberInstance(Locale("id", "ID")).apply { maximumFractionDigits = 1 }
     val idRupiah = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply { maximumFractionDigits = 0 }
@@ -65,6 +73,11 @@ fun FeedScreen(
             active?.let { viewModel.selectCycle(it.id) }
         }
     }
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
 
     Scaffold(
         topBar = {
