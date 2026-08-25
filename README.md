@@ -1,11 +1,39 @@
-<div align="center">
+# SEJAHTERA BERSAMA
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Aplikasi Android untuk manajemen budidaya ayam broiler, pencatatan operasional, kemitraan, GPS kandang, foto bukti, dan laporan PDF.
 
-  <h1>Built with AI Studio</h2>
+## Build di Google Cloud Shell
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+Project ini sengaja tidak menyimpan credential pribadi atau `google-services.json`.
+Untuk build debug:
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+```bash
+chmod +x gradlew
+./gradlew clean
+./gradlew assembleDebug
+```
 
-</div>
+APK debug:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+Script `gradlew` akan menggunakan Gradle yang tersedia di Cloud Shell. Jika belum ada, script mengunduh Gradle 9.3.1 ke cache pengguna.
+
+## Build release
+
+Gunakan keystore milik sendiri melalui environment variable:
+
+```bash
+export KEYSTORE_PATH="$HOME/my-upload-key.jks"
+export STORE_PASSWORD='***'
+export KEY_PASSWORD='***'
+./gradlew assembleRelease
+```
+
+Jangan memasukkan keystore, password, token, atau credential ke dalam ZIP/source code.
+
+## Catatan verifikasi akun
+
+Project tidak membuat OTP palsu atau menampilkan OTP di layar. Tanpa backend/provider online, aplikasi hanya dapat membuka Email/WhatsApp dengan pesan kode yang sudah disiapkan; pengiriman aktual tetap dilakukan oleh aplikasi Email/WhatsApp. Verifikasi online otomatis memerlukan backend/provider resmi dan credential milik pemilik aplikasi.
