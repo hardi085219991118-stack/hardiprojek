@@ -26,7 +26,6 @@ if [ ! -x "$GRADLE_BIN" ]; then
     exit 1
   fi
   rm -rf "$DIST_DIR"
-  mkdir -p "$DIST_DIR"
   TMP_DIR="$GRADLE_USER_HOME/sejahtera-bersama-gradle/extract-$GRADLE_VERSION"
   rm -rf "$TMP_DIR"
   mkdir -p "$TMP_DIR"
@@ -35,4 +34,8 @@ if [ ! -x "$GRADLE_BIN" ]; then
   rm -rf "$TMP_DIR"
 fi
 
-exec "$GRADLE_BIN/bin/gradle" "$@"
+if [ -x "$DIST_DIR/gradle-$GRADLE_VERSION/bin/gradle" ]; then
+  GRADLE_BIN="$DIST_DIR/gradle-$GRADLE_VERSION/bin/gradle"
+fi
+
+exec "$GRADLE_BIN" "$@"
