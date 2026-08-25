@@ -1,0 +1,6 @@
+{
+  "name": "SEJAHTERA BERSAMA",
+  "description": "Aplikasi Manajemen Budidaya Ayam Broiler & Laporan Kemitraan",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
