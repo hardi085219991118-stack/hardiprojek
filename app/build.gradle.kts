@@ -1,9 +1,18 @@
 plugins {
   alias(libs.plugins.android.application)
-  alias(libs.plugins.kotlin.android)
-  alias(libs.plugins.kotlin.compose)
+  // Apply Kotlin plugins programmatically below to avoid duplicate-registration issues
+  // alias(libs.plugins.kotlin.android)
+  // alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
+}
+
+// Ensure Kotlin plugins are applied only if not already registered by other scripts/plugins
+if (!pluginManager.hasPlugin("org.jetbrains.kotlin.android")) {
+  pluginManager.apply("org.jetbrains.kotlin.android")
+}
+if (!pluginManager.hasPlugin("org.jetbrains.kotlin.plugin.compose")) {
+  pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
