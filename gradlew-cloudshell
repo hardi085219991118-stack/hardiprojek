@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+set -eu
+# gradlew-cloudshell: helper wrapper for Google Cloud Shell builds
+# - Detects a filesystem with the most available space among candidates
+# - Sets GRADLE_USER_HOME to <chosen>/gradle-cache and runs ./gradlew with the same args
+
+# Candidates to consider (in order): /tmp, $HOME, current directory
+CANDIDATES="/tmp ${HOME:-$HOME} $(pwd)"
+CHOICE=""
+MAX_AVAIL=0
+
+for d in $CANDIDATES; do
+  if [ -d "$d" ]; then
+    # get available kilobytes using df -Pk
+    avail_kb=$(df -Pk "$d" 2>/dev/null | awk 'NR==2 {print $4}') || avail_kb=0
+    if [ -z "$avail_kb" ]; then avail_kb=0; fi
+    if [ "$avail_kb" -gt "$MAX_AVAIL" ]; then
+      MAX_AVAIL=$avail_kb
+      CHOICE=$d
+    fi
+  fi
+done
+
+# Fallback to /tmp if nothing found
+if [ -z "$CHOICE" ]; then
+  CHOICE="/tmp"
+fi
+
+GRADLE_USER_HOME="${GRADLE_USER_HOME:-$CHOICE/gradle-cache}"
+
+# If GRADLE_USER_HOME points to a path under $HOME and $HOME is small, user should run check_storage.sh first.
+mkdir -p "$GRADLE_USER_HOME"
+# Ensure ownership/permissions are safe: only allow current user to access
+# Do not use chmod -R a+rwx as requested.
+# Leave default permissions; create directory so Gradle can write into it.
+
+export GRADLE_USER_HOME
+
+echo "Using GRADLE_USER_HOME=$GRADLE_USER_HOME"
+
+# Ensure gradlew is executable
+if [ -f ./gradlew ] && [ ! -x ./gradlew ]; then
+  chmod +x ./gradlew
+fi
+
+# Finally exec gradlew
+exec ./gradlew "$@"
