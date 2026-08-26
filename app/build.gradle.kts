@@ -1,5 +1,6 @@
 plugins {
   alias(libs.plugins.android.application)
+  alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
@@ -57,6 +58,11 @@ android {
     includeInApk = false
     includeInBundle = true
   }
+}
+
+kotlin {
+  // Ensure Kotlin compilation uses Java 17 toolchain
+  jvmToolchain(17)
 }
 
 dependencies {
