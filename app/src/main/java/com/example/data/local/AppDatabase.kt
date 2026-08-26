@@ -23,15 +23,58 @@ import com.example.data.local.entity.*
         ExpenseEntity::class,
         HarvestEntity::class,
         FarmProfileEntity::class,
-        FeedScheduleLogEntity::class
+        FeedScheduleLogEntity::class,
+        MemberEntity::class,
+        ProfitDistributionEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun farmDao(): FarmDao
 
     companion object {
+        private val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `members` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `userId` INTEGER NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `memberNumber` TEXT NOT NULL,
+                        `phone` TEXT NOT NULL,
+                        `notes` TEXT NOT NULL,
+                        `isActive` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `profit_distributions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `userId` INTEGER NOT NULL,
+                        `cycleId` INTEGER NOT NULL,
+                        `coopId` INTEGER NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `period` TEXT NOT NULL,
+                        `totalRevenue` INTEGER NOT NULL,
+                        `totalExpense` INTEGER NOT NULL,
+                        `totalDeduction` INTEGER NOT NULL,
+                        `netProfit` INTEGER NOT NULL,
+                        `memberCount` INTEGER NOT NULL,
+                        `amountPerMember` INTEGER NOT NULL,
+                        `totalDistributed` INTEGER NOT NULL,
+                        `roundingRemainder` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `notes` TEXT NOT NULL,
+                        `memberDetailsJson` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("""
@@ -84,7 +127,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sejahtera_bersama_farm.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     // Prevent force-close on legacy installs when an older, unknown schema is found.
                     // Current supported migrations are still preferred; destructive fallback is only
                     // used by Room when no valid migration path exists.

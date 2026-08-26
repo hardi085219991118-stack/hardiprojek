@@ -141,6 +141,14 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         if (cycle != null) repository.getAllFeedSchedules(cycle.id) else flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val members: StateFlow<List<MemberEntity>> = userScopeId.flatMapLatest { userId ->
+        if (userId == null) flowOf(emptyList()) else repository.getMembers(userId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val profitDistributions: StateFlow<List<ProfitDistributionEntity>> = userScopeId.flatMapLatest { userId ->
+        if (userId == null) flowOf(emptyList()) else repository.getProfitDistributions(userId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     val dashboardSummary: StateFlow<DashboardSummary> = combine(
         currentCycle, currentCoop, currentPartner, dailyLogs, mortalityLogs,
@@ -490,4 +498,74 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // --- MEMBER OPERATIONS ---
+    fun saveMember(
+        member: MemberEntity,
+        onSuccess: (Long) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val uid = scopedUserId()
+        if (uid <= 0L) {
+            withContext(Dispatchers.Main) { onError("Sesi akun tidak valid.") }
+            return@launch
+        }
+        try {
+            val id = repository.saveMember(member.copy(userId = uid, updatedAt = System.currentTimeMillis()))
+            withContext(Dispatchers.Main) { onSuccess(id) }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "Gagal menyimpan data anggota.") }
+        }
+    }
+
+    fun deleteMember(
+        member: MemberEntity,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            repository.deleteMember(member)
+            withContext(Dispatchers.Main) { onSuccess() }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "Gagal menghapus data anggota.") }
+        }
+    }
+
+    // --- PROFIT DISTRIBUTION OPERATIONS ---
+    fun saveProfitDistribution(
+        distribution: ProfitDistributionEntity,
+        onSuccess: (Long) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val uid = scopedUserId()
+        if (uid <= 0L) {
+            withContext(Dispatchers.Main) { onError("Sesi akun tidak valid.") }
+            return@launch
+        }
+        try {
+            val id = repository.saveProfitDistribution(
+                distribution.copy(
+                    userId = uid,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            withContext(Dispatchers.Main) { onSuccess(id) }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "Gagal menyimpan hasil pembagian.") }
+        }
+    }
+
+    fun deleteProfitDistribution(
+        distribution: ProfitDistributionEntity,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            repository.deleteProfitDistribution(distribution)
+            withContext(Dispatchers.Main) { onSuccess() }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "Gagal menghapus riwayat pembagian.") }
+        }
+    }
 }
+

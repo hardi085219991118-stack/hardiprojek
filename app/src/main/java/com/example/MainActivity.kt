@@ -286,5 +286,31 @@ fun SejahteraBersamaApp() {
                 onBack = { navController.popBackStack() }
             )
         }
+
+        // --- TAHAP 10: MANAJEMEN ANGGOTA & PEMBAGIAN HASIL ---
+        composable("members") {
+            MembersScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("profit_sharing") {
+            ProfitSharingScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToMembers = { navController.navigate("members") },
+                onNavigateToHistory = { navController.navigate("profit_history") }
+            )
+        }
+
+        composable("profit_history") {
+            ProfitHistoryScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToNewSharing = { navController.navigate("profit_sharing") }
+            )
+        }
     }
 }
+

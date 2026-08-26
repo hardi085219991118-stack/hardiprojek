@@ -30,12 +30,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.MortalityLogEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.components.SimpleBarChart
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.FormatHelper
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -47,6 +53,7 @@ fun MortalityScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val mortalityLogs by viewModel.mortalityLogs.collectAsState()
@@ -54,6 +61,7 @@ fun MortalityScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteCandidate by remember { mutableStateOf<MortalityLogEntity?>(null) }
+    var processState by rememberProcessState()
 
     val numFmt = NumberFormat.getNumberInstance(Locale("id", "ID")).apply { maximumFractionDigits = 2 }
 
@@ -64,6 +72,11 @@ fun MortalityScreen(
             active?.let { viewModel.selectCycle(it.id) }
         }
     }
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
 
     Scaffold(
         topBar = {
@@ -362,14 +375,22 @@ fun MortalityScreen(
                 }
             },
             confirmButton = {
+                val isProcessing = processState is ProcessState.Processing
                 Button(
                     onClick = {
+                        if (isProcessing) return@Button
                         val count = countStr.toIntOrNull() ?: 0
                         val age = ageStr.toIntOrNull() ?: 0
                         if (count <= 0 || age <= 0) {
                             formError = "Isi umur dan jumlah ayam mati!"
                             return@Button
                         }
+
+                        processState = ProcessState.Processing(
+                            title = "MENYIMPAN LAPORAN MORTALITAS",
+                            message = "Sedang mencatat data mortalitas/afkir...",
+                            step = if (photoPath.isNotBlank()) "Menyimpan foto bukti bangkai/nekropsi" else "Mencatat data kematian harian"
+                        )
 
                         val entity = MortalityLogEntity(
                             cycleId = cycle.id,
@@ -381,10 +402,19 @@ fun MortalityScreen(
                             notes = notes,
                             photoUri = photoPath
                         )
-                        viewModel.saveMortality(entity) {
-                            showAddDialog = false
+                        coroutineScope.launch {
+                            delay(300)
+                            viewModel.saveMortality(entity) {
+                                showAddDialog = false
+                                processState = ProcessState.Success(
+                                    title = "LAPORAN MORTALITAS DISIMPAN",
+                                    message = "Data kematian ${FormatHelper.formatEkor(count)} (Umur $age hari) berhasil dicatat.",
+                                    detail = "Penyebab: $cause | Blok: $blockLocation"
+                                )
+                            }
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = FarmGreenPrimary),
                     modifier = Modifier.testTag("btn_save_mortality")
                 ) {
@@ -406,8 +436,22 @@ fun MortalityScreen(
             text = { Text("Hapus data kematian ${deleteCandidate?.count} ekor pada tanggal ${deleteCandidate?.date}?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    deleteCandidate?.let { viewModel.deleteMortality(it) }
+                    val candidate = deleteCandidate
                     deleteCandidate = null
+                    if (candidate != null) {
+                        processState = ProcessState.Processing(
+                            title = "MENGHAPUS DATA MORTALITAS",
+                            message = "Sedang menghapus catatan kematian..."
+                        )
+                        coroutineScope.launch {
+                            delay(200)
+                            viewModel.deleteMortality(candidate)
+                            processState = ProcessState.Success(
+                                title = "DATA BERHASIL DIHAPUS",
+                                message = "Catatan kematian ${candidate.count} ekor telah dihapus."
+                            )
+                        }
+                    }
                 })
             },
             dismissButton = {

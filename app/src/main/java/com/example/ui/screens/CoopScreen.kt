@@ -35,11 +35,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.CoopEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.theme.FarmGreenPrimary
 import com.example.util.LocationHelper
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -58,6 +62,12 @@ fun CoopScreen(
     var editingCoop by remember { mutableStateOf<CoopEntity?>(null) }
     var deleteCandidate by remember { mutableStateOf<CoopEntity?>(null) }
     var isLoadingGps by remember { mutableStateOf(false) }
+    var processState by rememberProcessState()
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
     var statusMessage by remember { mutableStateOf("") }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -570,8 +580,10 @@ fun CoopScreen(
                 }
             },
             confirmButton = {
+                val isProcessing = processState is ProcessState.Processing
                 Button(
                     onClick = {
+                        if (isProcessing) return@Button
                         if (name.isBlank()) {
                             formError = "Nama kandang wajib diisi!"
                             return@Button
@@ -580,6 +592,13 @@ fun CoopScreen(
                         val len = lengthStr.toDoubleOrNull() ?: 0.0
                         val wid = widthStr.toDoubleOrNull() ?: 0.0
                         val area = len * wid
+
+                        val isEdit = editingCoop != null
+                        processState = ProcessState.Processing(
+                            title = if (isEdit) "MENYIMPAN PERUBAHAN KANDANG" else "MENYIMPAN DATA KANDANG",
+                            message = "Sedang memvalidasi spesifikasi kandang...",
+                            step = if (photoPath.isNotBlank()) "Menyimpan foto fisik & koordinat GPS" else "Menyimpan profil kandang"
+                        )
 
                         val coopToSave = CoopEntity(
                             id = editingCoop?.id ?: 0,
@@ -605,10 +624,19 @@ fun CoopScreen(
                             gpsTimestamp = gpsTime ?: System.currentTimeMillis()
                         )
 
-                        viewModel.saveCoop(coopToSave) {
-                            showAddDialog = false
+                        coroutineScope.launch {
+                            delay(300)
+                            viewModel.saveCoop(coopToSave) {
+                                showAddDialog = false
+                                processState = ProcessState.Success(
+                                    title = "DATA KANDANG DISIMPAN",
+                                    message = "Data kandang '$name' (Kapasitas $cap ekor) berhasil disimpan.",
+                                    detail = "Tipe: $coopType | Luas: $area m²"
+                                )
+                            }
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = FarmGreenPrimary),
                     modifier = Modifier.testTag("btn_save_coop")
                 ) {
@@ -631,8 +659,22 @@ fun CoopScreen(
             text = { Text("Apakah Anda yakin ingin menghapus data '${deleteCandidate?.name}'?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    deleteCandidate?.let { viewModel.deleteCoop(it) }
+                    val candidate = deleteCandidate
                     deleteCandidate = null
+                    if (candidate != null) {
+                        processState = ProcessState.Processing(
+                            title = "MENGHAPUS DATA KANDANG",
+                            message = "Sedang menghapus master kandang..."
+                        )
+                        coroutineScope.launch {
+                            delay(200)
+                            viewModel.deleteCoop(candidate)
+                            processState = ProcessState.Success(
+                                title = "KANDANG BERHASIL DIHAPUS",
+                                message = "Data kandang '${candidate.name}' telah dihapus."
+                            )
+                        }
+                    }
                 })
             },
             dismissButton = {

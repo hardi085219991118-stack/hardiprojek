@@ -314,3 +314,47 @@ data class FeedScheduleLogEntity(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "members")
+data class MemberEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val userId: Long = 0,
+    val name: String,
+    val memberNumber: String = "",
+    val phone: String = "",
+    val notes: String = "",
+    val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "profit_distributions")
+data class ProfitDistributionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val userId: Long = 0,
+    val cycleId: Long = 0,
+    val coopId: Long = 0,
+    val date: String,                  // YYYY-MM-DD
+    val period: String = "",           // Periode pembagian
+    val totalRevenue: Long = 0L,       // Total Hasil (Rp)
+    val totalExpense: Long = 0L,       // Biaya (Rp)
+    val totalDeduction: Long = 0L,     // Potongan (Rp)
+    val netProfit: Long = 0L,          // Hasil Bersih = Total Hasil - Biaya - Potongan
+    val memberCount: Int = 0,          // Jumlah Anggota
+    val amountPerMember: Long = 0L,    // Hasil Per Anggota = Hasil Bersih ÷ Jumlah Anggota
+    val totalDistributed: Long = 0L,   // Total Pembagian = Hasil Per Anggota × Jumlah Anggota
+    val roundingRemainder: Long = 0L,  // Sisa Pembulatan / Selisih = Hasil Bersih - Total Pembagian
+    val status: String = "PEMBAGIAN SESUAI", // "PEMBAGIAN SESUAI" atau "PEMBAGIAN MEMILIKI SISA PEMBULATAN"
+    val notes: String = "",            // Keterangan / Alasan Perubahan
+    val memberDetailsJson: String = "",// JSON array data anggota & nilai pembagian
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+data class DistributionMemberItem(
+    val memberId: Long,
+    val memberName: String,
+    val memberNumber: String = "",
+    val amount: Long
+)
+
+

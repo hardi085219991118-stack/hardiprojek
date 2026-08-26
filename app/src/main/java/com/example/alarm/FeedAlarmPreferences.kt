@@ -11,10 +11,11 @@ class FeedAlarmPreferences(context: Context) {
         private const val KEY_ALARM_MASTER_ENABLED = "key_alarm_master_enabled"
         private const val KEY_SOUND_ENABLED = "key_sound_enabled"
         private const val KEY_VIBRATION_ENABLED = "key_vibration_enabled"
-        private const val KEY_SLOT_0600 = "key_slot_0600"
-        private const val KEY_SLOT_1100 = "key_slot_1100"
-        private const val KEY_SLOT_1600 = "key_slot_1600"
-        private const val KEY_SLOT_2000 = "key_slot_2000"
+
+        private const val PREFIX_SLOT_ENABLED = "key_slot_enabled_"
+        private const val PREFIX_SLOT_SOUND = "key_slot_sound_"
+        private const val PREFIX_SLOT_VOLUME = "key_slot_volume_"
+        private const val PREFIX_SLOT_SNOOZE = "key_slot_snooze_"
     }
 
     var isAlarmMasterEnabled: Boolean
@@ -29,22 +30,52 @@ class FeedAlarmPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_VIBRATION_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_VIBRATION_ENABLED, value).apply()
 
+    // --- PER-SLOT ACTIVE STATUS ---
     fun isSlotEnabled(timeStr: String): Boolean {
-        return when (timeStr) {
-            "06:00" -> prefs.getBoolean(KEY_SLOT_0600, true)
-            "11:00" -> prefs.getBoolean(KEY_SLOT_1100, true)
-            "16:00" -> prefs.getBoolean(KEY_SLOT_1600, true)
-            "20:00" -> prefs.getBoolean(KEY_SLOT_2000, true)
-            else -> true
-        }
+        val sanitized = sanitizeSlotKey(timeStr)
+        return prefs.getBoolean("$PREFIX_SLOT_ENABLED$sanitized", true)
     }
 
     fun setSlotEnabled(timeStr: String, enabled: Boolean) {
-        when (timeStr) {
-            "06:00" -> prefs.edit().putBoolean(KEY_SLOT_0600, enabled).apply()
-            "11:00" -> prefs.edit().putBoolean(KEY_SLOT_1100, enabled).apply()
-            "16:00" -> prefs.edit().putBoolean(KEY_SLOT_1600, enabled).apply()
-            "20:00" -> prefs.edit().putBoolean(KEY_SLOT_2000, enabled).apply()
-        }
+        val sanitized = sanitizeSlotKey(timeStr)
+        prefs.edit().putBoolean("$PREFIX_SLOT_ENABLED$sanitized", enabled).apply()
+    }
+
+    // --- PER-SLOT SOUND ID ---
+    fun getSlotSoundId(timeStr: String): String {
+        val sanitized = sanitizeSlotKey(timeStr)
+        val defaultSound = FarmAudioCatalog.getDefaultSoundForSlot(timeStr)
+        return prefs.getString("$PREFIX_SLOT_SOUND$sanitized", defaultSound) ?: defaultSound
+    }
+
+    fun setSlotSoundId(timeStr: String, soundId: String) {
+        val sanitized = sanitizeSlotKey(timeStr)
+        prefs.edit().putString("$PREFIX_SLOT_SOUND$sanitized", soundId).apply()
+    }
+
+    // --- PER-SLOT VOLUME (0.1f - 1.0f) ---
+    fun getSlotVolume(timeStr: String): Float {
+        val sanitized = sanitizeSlotKey(timeStr)
+        return prefs.getFloat("$PREFIX_SLOT_VOLUME$sanitized", 1.0f)
+    }
+
+    fun setSlotVolume(timeStr: String, volume: Float) {
+        val sanitized = sanitizeSlotKey(timeStr)
+        prefs.edit().putFloat("$PREFIX_SLOT_VOLUME$sanitized", volume.coerceIn(0.1f, 1.0f)).apply()
+    }
+
+    // --- PER-SLOT SNOOZE MINUTES (Default 5 menit) ---
+    fun getSlotSnoozeMinutes(timeStr: String): Int {
+        val sanitized = sanitizeSlotKey(timeStr)
+        return prefs.getInt("$PREFIX_SLOT_SNOOZE$sanitized", 5)
+    }
+
+    fun setSlotSnoozeMinutes(timeStr: String, minutes: Int) {
+        val sanitized = sanitizeSlotKey(timeStr)
+        prefs.edit().putInt("$PREFIX_SLOT_SNOOZE$sanitized", minutes.coerceAtLeast(1)).apply()
+    }
+
+    private fun sanitizeSlotKey(timeStr: String): String {
+        return timeStr.replace(":", "_").trim()
     }
 }

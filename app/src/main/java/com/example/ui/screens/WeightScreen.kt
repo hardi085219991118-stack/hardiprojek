@@ -30,12 +30,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.WeightSampleEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.components.SimpleLineChart
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.FormatHelper
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -47,6 +53,7 @@ fun WeightScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val weightSamples by viewModel.weightSamples.collectAsState()
@@ -54,6 +61,7 @@ fun WeightScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteCandidate by remember { mutableStateOf<WeightSampleEntity?>(null) }
+    var processState by rememberProcessState()
 
     val numFmt = NumberFormat.getNumberInstance(Locale("id", "ID")).apply { maximumFractionDigits = 2 }
 
@@ -64,6 +72,11 @@ fun WeightScreen(
             active?.let { viewModel.selectCycle(it.id) }
         }
     }
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
 
     Scaffold(
         topBar = {
@@ -390,8 +403,10 @@ fun WeightScreen(
                 }
             },
             confirmButton = {
+                val isProcessing = processState is ProcessState.Processing
                 Button(
                     onClick = {
+                        if (isProcessing) return@Button
                         val age = ageStr.toIntOrNull() ?: 0
                         val count = sampleCountStr.toIntOrNull() ?: 0
                         val totalKg = totalWeightStr.toDoubleOrNull() ?: 0.0
@@ -401,6 +416,12 @@ fun WeightScreen(
                             formError = "Lengkapi data penimbangan dengan benar!"
                             return@Button
                         }
+
+                        processState = ProcessState.Processing(
+                            title = "MENYIMPAN SAMPLING BOBOT",
+                            message = "Sedang menghitung rata-rata & keseragaman bobot...",
+                            step = if (photoPath.isNotBlank()) "Menyimpan foto timbangan sampling" else "Mencatat bobot rata-rata"
+                        )
 
                         val sample = WeightSampleEntity(
                             cycleId = cycle.id,
@@ -413,10 +434,19 @@ fun WeightScreen(
                             notes = notes,
                             photoUri = photoPath
                         )
-                        viewModel.saveWeightSample(sample) {
-                            showAddDialog = false
+                        coroutineScope.launch {
+                            delay(300)
+                            viewModel.saveWeightSample(sample) {
+                                showAddDialog = false
+                                processState = ProcessState.Success(
+                                    title = "SAMPLING BOBOT DISIMPAN",
+                                    message = "Sampling umur $age hari (${FormatHelper.formatGram(avgGram)} / ekor) berhasil disimpan.",
+                                    detail = "Jumlah sampel: $count ekor | Total: ${FormatHelper.formatKg(totalKg)}"
+                                )
+                            }
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = FarmGreenPrimary),
                     modifier = Modifier.testTag("btn_save_weight")
                 ) {
@@ -438,8 +468,22 @@ fun WeightScreen(
             text = { Text("Hapus data penimbangan umur ${deleteCandidate?.ageDays} hari?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    deleteCandidate?.let { viewModel.deleteWeightSample(it) }
+                    val candidate = deleteCandidate
                     deleteCandidate = null
+                    if (candidate != null) {
+                        processState = ProcessState.Processing(
+                            title = "MENGHAPUS DATA BOBOT",
+                            message = "Sedang menghapus data sampling..."
+                        )
+                        coroutineScope.launch {
+                            delay(200)
+                            viewModel.deleteWeightSample(candidate)
+                            processState = ProcessState.Success(
+                                title = "DATA BERHASIL DIHAPUS",
+                                message = "Data sampling umur ${candidate.ageDays} hari telah dihapus."
+                            )
+                        }
+                    }
                 })
             },
             dismissButton = {

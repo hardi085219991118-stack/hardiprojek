@@ -51,15 +51,31 @@ class FarmRepository(private val dao: FarmDao) {
     suspend fun deleteHarvest(harvest: HarvestEntity) = dao.deleteHarvest(harvest)
     suspend fun saveFarmProfile(profile: FarmProfileEntity) = dao.saveFarmProfile(profile)
 
+    // Members (Data Anggota)
+    fun getMembers(userId: Long): Flow<List<MemberEntity>> = dao.getAllMembers().map { list -> list.filter { it.userId == userId } }
+    suspend fun getMemberById(id: Long, userId: Long): MemberEntity? = dao.getMemberById(id)?.takeIf { it.userId == userId }
+    suspend fun saveMember(member: MemberEntity): Long = if (member.id == 0L) dao.insertMember(member) else { dao.updateMember(member); member.id }
+    suspend fun deleteMember(member: MemberEntity) = dao.deleteMember(member)
+
+    // Profit Distributions (Hasil & Riwayat Pembagian)
+    fun getProfitDistributions(userId: Long): Flow<List<ProfitDistributionEntity>> = dao.getAllProfitDistributions().map { list -> list.filter { it.userId == userId } }
+    suspend fun getProfitDistributionById(id: Long, userId: Long): ProfitDistributionEntity? = dao.getProfitDistributionById(id)?.takeIf { it.userId == userId }
+    suspend fun saveProfitDistribution(distribution: ProfitDistributionEntity): Long = if (distribution.id == 0L) dao.insertProfitDistribution(distribution) else { dao.updateProfitDistribution(distribution); distribution.id }
+    suspend fun deleteProfitDistribution(distribution: ProfitDistributionEntity) = dao.deleteProfitDistribution(distribution)
+
     suspend fun getAllDirectData(userId: Long): Map<String, Any> {
         val coops = dao.getAllCoopsDirect().filter { it.userId == userId }
         val partners = dao.getAllPartnersDirect().filter { it.userId == userId }
         val cycles = dao.getAllCyclesDirect().filter { it.userId == userId }
+        val members = dao.getAllMembersDirect().filter { it.userId == userId }
+        val profitDistributions = dao.getAllProfitDistributionsDirect().filter { it.userId == userId }
         val cycleIds = cycles.map { it.id }.toSet()
         return mapOf(
             "coops" to coops,
             "partners" to partners,
             "cycles" to cycles,
+            "members" to members,
+            "profit_distributions" to profitDistributions,
             "daily_logs" to dao.getAllDailyLogsDirect().filter { it.cycleId in cycleIds },
             "mortality_logs" to dao.getAllMortalityLogsDirect().filter { it.cycleId in cycleIds },
             "feed_stocks" to dao.getAllFeedStocksDirect().filter { it.cycleId in cycleIds },
@@ -78,6 +94,8 @@ class FarmRepository(private val dao: FarmDao) {
         dao.getAllCoopsDirect().filter { it.userId == userId }.forEach { dao.deleteCoop(it) }
         dao.getAllPartnersDirect().filter { it.userId == userId }.forEach { dao.deletePartner(it) }
         dao.getAllCyclesDirect().filter { it.userId == userId }.forEach { dao.deleteCycle(it) }
+        dao.getAllMembersDirect().filter { it.userId == userId }.forEach { dao.deleteMember(it) }
+        dao.getAllProfitDistributionsDirect().filter { it.userId == userId }.forEach { dao.deleteProfitDistribution(it) }
         dao.getAllDailyLogsDirect().filter { it.cycleId in cycleIds }.forEach { dao.deleteDailyLog(it) }
         dao.getAllMortalityLogsDirect().filter { it.cycleId in cycleIds }.forEach { dao.deleteMortalityLog(it) }
         dao.getAllFeedStocksDirect().filter { it.cycleId in cycleIds }.forEach { dao.deleteFeedStock(it) }
@@ -89,6 +107,7 @@ class FarmRepository(private val dao: FarmDao) {
         dao.getAllDispatchHistoryDirect().filter { it.userId == userId }.forEach { dao.deleteDispatchHistory(it) }
         cycleIds.forEach { dao.clearFeedSchedulesByCycle(it) }
     }
+
 
     // Feed Schedules
     fun getFeedSchedulesByDate(cycleId: Long, date: String): Flow<List<FeedScheduleLogEntity>> =

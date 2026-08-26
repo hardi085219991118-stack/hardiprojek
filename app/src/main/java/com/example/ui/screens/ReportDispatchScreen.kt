@@ -392,7 +392,7 @@ fun ReportDispatchScreen(
                                                 cycle = cycle,
                                                 dailyLog = latestLog,
                                                 mortalities = emptyList(),
-                                                feedRecords = feedStocks,
+                                                feedStocks = feedStocks,
                                                 medicines = emptyList()
                                             )
                                         }

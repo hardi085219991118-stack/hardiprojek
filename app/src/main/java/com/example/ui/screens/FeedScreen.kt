@@ -436,8 +436,10 @@ OutlinedTextField(
                 }
             },
             confirmButton = {
+                val isProcessing = processState is ProcessState.Processing
                 Button(
                     onClick = {
+                        if (isProcessing) return@Button
                         val bags = bagsStr.toDoubleOrNull() ?: 0.0
                         val kgPerBag = kgPerBagStr.toDoubleOrNull() ?: 50.0
                         val totalKg = bags * kgPerBag
@@ -449,6 +451,13 @@ OutlinedTextField(
 
                         val pricePerBag = pricePerBagStr.toDoubleOrNull() ?: 0.0
                         val totalPrice = pricePerBag * bags
+
+                        val isMasuk = selectedType == "IN"
+                        processState = ProcessState.Processing(
+                            title = if (isMasuk) "MENYIMPAN PAKAN MASUK" else "MENYIMPAN PENGGUNAAN PAKAN",
+                            message = "Sedang memproses mutasi stok pakan...",
+                            step = if (photoPath.isNotBlank()) "Menyimpan foto DO/surat jalan & bukti fisik" else "Memperbarui stok pakan kandang"
+                        )
 
                         val feedToSave = FeedStockEntity(
                             cycleId = cycle.id,
@@ -468,10 +477,19 @@ OutlinedTextField(
                             photoUri = photoPath
                         )
 
-                        viewModel.saveFeedStock(feedToSave) {
-                            showAddDialog = false
+                        coroutineScope.launch {
+                            delay(300)
+                            viewModel.saveFeedStock(feedToSave) {
+                                showAddDialog = false
+                                processState = ProcessState.Success(
+                                    title = "PAKAN BERHASIL DISIMPAN",
+                                    message = "Transaksi pakan $feedType ($bags sak / ${FormatHelper.formatKg(totalKg)}) telah tercatat.",
+                                    detail = "DO: $doNumber | Tanggal: $date"
+                                )
+                            }
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = FarmGreenPrimary),
                     modifier = Modifier.testTag("btn_save_feed")
                 ) {
@@ -493,8 +511,22 @@ OutlinedTextField(
             text = { Text("Hapus transaksi pakan tanggal ${deleteCandidate?.date}?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    deleteCandidate?.let { viewModel.deleteFeedStock(it) }
+                    val candidate = deleteCandidate
                     deleteCandidate = null
+                    if (candidate != null) {
+                        processState = ProcessState.Processing(
+                            title = "MENGHAPUS CATATAN PAKAN",
+                            message = "Sedang memperbarui saldo stok..."
+                        )
+                        coroutineScope.launch {
+                            delay(200)
+                            viewModel.deleteFeedStock(candidate)
+                            processState = ProcessState.Success(
+                                title = "CATATAN PAKAN DIHAPUS",
+                                message = "Transaksi pakan telah dihapus dari sistem."
+                            )
+                        }
+                    }
                 })
             },
             dismissButton = {

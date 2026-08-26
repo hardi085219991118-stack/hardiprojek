@@ -30,11 +30,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.DeletePinProtectedButton
+import com.example.ui.components.ProcessNotificationDialog
+import com.example.ui.components.ProcessState
+import com.example.ui.components.rememberProcessState
 import com.example.data.local.entity.HarvestEntity
 import com.example.ui.FarmViewModel
 import com.example.ui.components.StatCard
 import com.example.ui.theme.FarmGreenPrimary
+import com.example.util.FormatHelper
 import com.example.util.PhotoStorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -46,6 +52,7 @@ fun HarvestScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val currentCycle by viewModel.currentCycle.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
     val currentPartner by viewModel.currentPartner.collectAsState()
@@ -54,6 +61,7 @@ fun HarvestScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteCandidate by remember { mutableStateOf<HarvestEntity?>(null) }
+    var processState by rememberProcessState()
 
     val idRupiah = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply { maximumFractionDigits = 0 }
     val numFmt = NumberFormat.getNumberInstance(Locale("id", "ID")).apply { maximumFractionDigits = 2 }
@@ -65,6 +73,11 @@ fun HarvestScreen(
             active?.let { viewModel.selectCycle(it.id) }
         }
     }
+
+    ProcessNotificationDialog(
+        state = processState,
+        onDismissRequest = { processState = ProcessState.Idle }
+    )
 
     Scaffold(
         topBar = {
@@ -383,8 +396,10 @@ fun HarvestScreen(
                 }
             },
             confirmButton = {
+                val isProcessing = processState is ProcessState.Processing
                 Button(
                     onClick = {
+                        if (isProcessing) return@Button
                         val count = countStr.toIntOrNull() ?: 0
                         val totalKg = totalWeightStr.toDoubleOrNull() ?: 0.0
                         val pricePerKg = pricePerKgStr.toDoubleOrNull() ?: 0.0
@@ -396,6 +411,12 @@ fun HarvestScreen(
 
                         val avgKg = totalKg / count
                         val totalRev = totalKg * pricePerKg
+
+                        processState = ProcessState.Processing(
+                            title = "MENYIMPAN DATA PANEN",
+                            message = "Sedang memproses realisasi penjualan panen...",
+                            step = if (photoPath.isNotBlank()) "Menyimpan foto timbangan & DO panen" else "Mencatat tonase dan pendapatan"
+                        )
 
                         val entity = HarvestEntity(
                             cycleId = cycle.id,
@@ -412,10 +433,19 @@ fun HarvestScreen(
                             notes = notes,
                             photoUri = photoPath
                         )
-                        viewModel.saveHarvest(entity) {
-                            showAddDialog = false
+                        coroutineScope.launch {
+                            delay(300)
+                            viewModel.saveHarvest(entity) {
+                                showAddDialog = false
+                                processState = ProcessState.Success(
+                                    title = "DATA PANEN BERHASIL DISIMPAN",
+                                    message = "Panen ${FormatHelper.formatEkor(count)} (${FormatHelper.formatKg(totalKg)}) telah tercatat.",
+                                    detail = "Total: ${FormatHelper.formatRupiah(totalRev)} | DO: $doNumber"
+                                )
+                            }
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = FarmGreenPrimary),
                     modifier = Modifier.testTag("btn_save_harvest")
                 ) {
@@ -437,8 +467,22 @@ fun HarvestScreen(
             text = { Text("Hapus data panen tanggal ${deleteCandidate?.harvestDate} (${deleteCandidate?.birdCount} ekor)?") },
             confirmButton = {
                 DeletePinProtectedButton(onAuthorizedDelete = {
-                    deleteCandidate?.let { viewModel.deleteHarvest(it) }
+                    val candidate = deleteCandidate
                     deleteCandidate = null
+                    if (candidate != null) {
+                        processState = ProcessState.Processing(
+                            title = "MENGHAPUS DATA PANEN",
+                            message = "Sedang menghapus catatan panen..."
+                        )
+                        coroutineScope.launch {
+                            delay(200)
+                            viewModel.deleteHarvest(candidate)
+                            processState = ProcessState.Success(
+                                title = "DATA BERHASIL DIHAPUS",
+                                message = "Data panen tanggal ${candidate.harvestDate} telah dihapus."
+                            )
+                        }
+                    }
                 })
             },
             dismissButton = {

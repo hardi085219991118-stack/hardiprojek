@@ -316,8 +316,14 @@ fun DashboardScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ActionMenuItem(Icons.Default.MenuBook, "Panduan Budidaya", "menu_panduan", containerColor = Color(0xFF2E7D32), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("broiler_guide") }
                         ActionMenuItem(Icons.Default.Alarm, "Alarm Cerdas Pakan", "menu_feed_alarm", containerColor = Color(0xFFE65100), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("feed_alarm") }
+                        ActionMenuItem(Icons.Default.Group, "Data Anggota", "menu_members", containerColor = Color(0xFF1565C0), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("members") }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ActionMenuItem(Icons.Default.AccountBalanceWallet, "Hasil Pembagian", "menu_profit_sharing", containerColor = Color(0xFF2E7D32), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("profit_sharing") }
+                        ActionMenuItem(Icons.Default.History, "Riwayat Pembagian", "menu_profit_history", containerColor = Color(0xFF455A64), contentColor = Color.White, modifier = Modifier.weight(1f)) { onNavigate("profit_history") }
                         Spacer(modifier = Modifier.weight(1f))
                     }
+
 
                 }
             }

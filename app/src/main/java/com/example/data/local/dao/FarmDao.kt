@@ -349,5 +349,50 @@ interface FarmDao {
 
     @Query("DELETE FROM feed_schedule_logs WHERE cycleId = :cycleId")
     suspend fun clearFeedSchedulesByCycle(cycleId: Long)
+
+    // --- MEMBERS ---
+    @Query("SELECT * FROM members ORDER BY name ASC")
+    fun getAllMembers(): Flow<List<MemberEntity>>
+
+    @Query("SELECT * FROM members WHERE id = :id LIMIT 1")
+    suspend fun getMemberById(id: Long): MemberEntity?
+
+    @Query("SELECT * FROM members")
+    suspend fun getAllMembersDirect(): List<MemberEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMember(member: MemberEntity): Long
+
+    @Update
+    suspend fun updateMember(member: MemberEntity)
+
+    @Delete
+    suspend fun deleteMember(member: MemberEntity)
+
+    @Query("DELETE FROM members WHERE id = :id")
+    suspend fun deleteMemberById(id: Long)
+
+    // --- PROFIT DISTRIBUTIONS ---
+    @Query("SELECT * FROM profit_distributions ORDER BY date DESC, createdAt DESC")
+    fun getAllProfitDistributions(): Flow<List<ProfitDistributionEntity>>
+
+    @Query("SELECT * FROM profit_distributions WHERE id = :id LIMIT 1")
+    suspend fun getProfitDistributionById(id: Long): ProfitDistributionEntity?
+
+    @Query("SELECT * FROM profit_distributions")
+    suspend fun getAllProfitDistributionsDirect(): List<ProfitDistributionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProfitDistribution(distribution: ProfitDistributionEntity): Long
+
+    @Update
+    suspend fun updateProfitDistribution(distribution: ProfitDistributionEntity)
+
+    @Delete
+    suspend fun deleteProfitDistribution(distribution: ProfitDistributionEntity)
+
+    @Query("DELETE FROM profit_distributions WHERE id = :id")
+    suspend fun deleteProfitDistributionById(id: Long)
 }
+
 

@@ -15,6 +15,7 @@ object FeedAlarmScheduler {
     const val ACTION_STATUS_DONE = "com.example.action.FEED_STATUS_DONE"
     const val ACTION_STATUS_SNOOZE = "com.example.action.FEED_STATUS_SNOOZE"
     const val ACTION_STATUS_SKIP = "com.example.action.FEED_STATUS_SKIP"
+    const val ACTION_STOP_ALARM = "com.example.action.STOP_ALARM"
 
     const val EXTRA_CYCLE_ID = "extra_cycle_id"
     const val EXTRA_COOP_ID = "extra_coop_id"
@@ -27,6 +28,8 @@ object FeedAlarmScheduler {
     const val EXTRA_FEED_TYPE = "extra_feed_type"
     const val EXTRA_SCHEDULE_ID = "extra_schedule_id"
     const val EXTRA_SNOOZE_MINUTES = "extra_snooze_minutes"
+    const val EXTRA_SOUND_ID = "extra_sound_id"
+    const val EXTRA_VOLUME = "extra_volume"
 
     /**
      * Jadwalkan ulang semua slot alarm untuk siklus aktif hari ini / besok.
@@ -44,10 +47,15 @@ object FeedAlarmScheduler {
             return
         }
 
+        // Pastikan file suara ter-generate di disk
+        FarmSoundSynthesizer.ensureAudioFilesExist(context)
+
         val phaseDetail = FeedGuideRules.getPhaseDetailForAge(ageDays)
 
         FeedGuideRules.STANDARD_SLOTS.forEachIndexed { index, slot ->
             if (prefs.isSlotEnabled(slot.time)) {
+                val soundId = prefs.getSlotSoundId(slot.time)
+                val volume = prefs.getSlotVolume(slot.time)
                 scheduleSingleSlot(
                     context = context,
                     slotIndex = index,
@@ -59,7 +67,9 @@ object FeedAlarmScheduler {
                     coopName = coopName,
                     ageDays = ageDays,
                     phase = phaseDetail.phaseName,
-                    feedType = phaseDetail.feedType
+                    feedType = phaseDetail.feedType,
+                    soundId = soundId,
+                    volume = volume
                 )
             } else {
                 cancelSingleSlot(context, index, cycleId)
@@ -81,7 +91,9 @@ object FeedAlarmScheduler {
         coopName: String,
         ageDays: Int,
         phase: String,
-        feedType: String
+        feedType: String,
+        soundId: String = FarmAudioCatalog.getDefaultSoundForSlot(timeStr),
+        volume: Float = 1.0f
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val parts = timeStr.split(":")
@@ -111,6 +123,8 @@ object FeedAlarmScheduler {
             putExtra(EXTRA_AGE_DAYS, ageDays)
             putExtra(EXTRA_PHASE, phase)
             putExtra(EXTRA_FEED_TYPE, feedType)
+            putExtra(EXTRA_SOUND_ID, soundId)
+            putExtra(EXTRA_VOLUME, volume)
         }
 
         val requestCode = generateRequestCode(slotIndex, cycleId)
@@ -151,7 +165,7 @@ object FeedAlarmScheduler {
                     pendingIntent
                 )
             }
-            Log.d(TAG, "Scheduled alarm slot $slotName ($timeStr) at ${calendar.time}")
+            Log.d(TAG, "Scheduled alarm slot $slotName ($timeStr) with sound: $soundId at ${calendar.time}")
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling alarm: ${e.message}", e)
         }
@@ -172,10 +186,14 @@ object FeedAlarmScheduler {
         ageDays: Int,
         phase: String,
         feedType: String,
-        snoozeMinutes: Int
+        snoozeMinutes: Int,
+        soundId: String? = null,
+        volume: Float = 1.0f
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val triggerTime = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
+        val prefs = FeedAlarmPreferences(context)
+        val actualSoundId = soundId ?: prefs.getSlotSoundId(timeStr)
 
         val intent = Intent(context, FeedAlarmReceiver::class.java).apply {
             action = ACTION_FEED_ALARM
@@ -189,6 +207,8 @@ object FeedAlarmScheduler {
             putExtra(EXTRA_AGE_DAYS, ageDays)
             putExtra(EXTRA_PHASE, phase)
             putExtra(EXTRA_FEED_TYPE, feedType)
+            putExtra(EXTRA_SOUND_ID, actualSoundId)
+            putExtra(EXTRA_VOLUME, volume)
         }
 
         val requestCode = (scheduleId.toInt() * 100) + 777
@@ -221,7 +241,7 @@ object FeedAlarmScheduler {
                     pendingIntent
                 )
             }
-            Log.d(TAG, "Scheduled snooze for $snoozeMinutes mins")
+            Log.d(TAG, "Scheduled snooze for $snoozeMinutes mins with sound $actualSoundId")
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling snooze: ${e.message}", e)
         }

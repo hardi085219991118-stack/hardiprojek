@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -79,83 +78,90 @@ fun ReportsPdfScreen(
 
     fun generateSelectedPdf(onComplete: (File?) -> Unit) {
         val profile = farmProfile
-        if (profile == null) {
-            processState = ProcessState.Error(
-                title = "Profil Farm Belum Lengkap",
-                message = "Silakan lengkapi profil peternakan Anda terlebih dahulu sebelum mencetak dokumen resmi."
-            )
-            return
-        }
+        val cycle = currentCycle
+        val coop = currentCoop
+        val partner = currentPartner
 
+        // 1. Indikator Proses: Memeriksa data laporan...
         processState = ProcessState.Processing(
-            title = "MEMBUAT DOKUMEN PDF",
-            message = "Sedang mengumpulkan data laporan...",
-            step = "1/4 Membaca data operasional"
+            title = "MEMVALIDASI DATA LAPORAN",
+            message = "Memeriksa data laporan...",
+            step = "1/3 Verifikasi integritas & konsistensi data"
         )
 
         coroutineScope.launch {
             try {
-                delay(200)
-                processState = ProcessState.Processing(
-                    title = "MEMBUAT DOKUMEN PDF",
-                    message = "Sedang memproses & memverifikasi foto bukti...",
-                    step = "2/4 Memproses bukti foto & watermark"
+                delay(300)
+                // 2. Validasi Integritas Data
+                val validation = PdfReportGenerator.validateReportData(
+                    reportType = selectedReportType,
+                    profile = profile,
+                    coop = coop,
+                    cycle = cycle,
+                    dailyLogs = dailyLogs,
+                    mortalities = mortalityLogs,
+                    feedStocks = feedStocks,
+                    expenses = expenses,
+                    harvests = harvests,
+                    weights = weightSamples,
+                    medicines = medicines
                 )
 
-                val cycle = currentCycle
-                val coop = currentCoop
-                val partner = currentPartner
+                if (!validation.isValid) {
+                    processState = ProcessState.Error(
+                        title = "Data Belum Lengkap / Tidak Sesuai",
+                        message = "Data belum dapat dibuat menjadi PDF karena terdapat ketidaksesuaian: ${validation.message}\n\n${validation.detail}"
+                    )
+                    return@launch
+                }
 
-                delay(200)
+                // 3. Indikator Proses: Data berhasil diverifikasi -> Membuat PDF...
                 processState = ProcessState.Processing(
                     title = "MEMBUAT DOKUMEN PDF",
-                    message = "Menyusun tata letak halaman standar A4...",
-                    step = "3/4 Merender format tabel & tanda tangan"
+                    message = "Data berhasil diverifikasi. Membuat PDF...",
+                    step = "2/3 Merender halaman standar A4 & watermark foto"
                 )
+                delay(350)
 
                 val file = withContext(Dispatchers.IO) {
                     when (selectedReportType) {
                         0 -> {
                             val log = dailyLogs.lastOrNull() ?: return@withContext null
-                            if (cycle == null) return@withContext null
-                            PdfReportGenerator.generateDailyReportPdf(context, profile, coop, partner, cycle, log, mortalityLogs, feedStocks, medicines, photos)
+                            PdfReportGenerator.generateDailyReportPdf(context, profile!!, coop, partner, cycle!!, log, mortalityLogs, feedStocks, medicines, photos)
                         }
                         1 -> {
-                            if (cycle == null) return@withContext null
-                            PdfReportGenerator.generatePeriodReportPdf(context, profile, coop, cycle, dailyLogs, photos, "Perkembangan Harian Lengkap")
+                            PdfReportGenerator.generatePeriodReportPdf(context, profile!!, coop, cycle!!, dailyLogs, photos, "Perkembangan Harian Lengkap")
                         }
                         2 -> {
-                            if (cycle == null) return@withContext null
-                            PdfReportGenerator.generatePartnershipReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
+                            PdfReportGenerator.generatePartnershipReportPdf(context, profile!!, coop, partner, cycle!!, dailyLogs, harvests, expenses, feedStocks, photos)
                         }
                         3 -> {
-                            if (cycle == null) return@withContext null
-                            PdfReportGenerator.generateCycleEndReportPdf(context, profile, coop, partner, cycle, dailyLogs, harvests, expenses, feedStocks, photos)
+                            PdfReportGenerator.generateCycleEndReportPdf(context, profile!!, coop, partner, cycle!!, dailyLogs, harvests, expenses, feedStocks, photos)
                         }
                         4 -> {
                             val targetCoop = coop ?: return@withContext null
-                            PdfReportGenerator.generateCoopPdf(context, profile, targetCoop, photos)
+                            PdfReportGenerator.generateCoopPdf(context, profile!!, targetCoop, photos)
                         }
                         5 -> {
-                            PdfReportGenerator.generateExpensePdf(context, profile, coop, cycle, expenses, photos)
+                            PdfReportGenerator.generateExpensePdf(context, profile!!, coop, cycle, expenses, photos)
                         }
                         6 -> {
-                            PdfReportGenerator.generateMortalityPdf(context, profile, coop, cycle, mortalityLogs, photos)
+                            PdfReportGenerator.generateMortalityPdf(context, profile!!, coop, cycle, mortalityLogs, photos)
                         }
                         7 -> {
-                            PdfReportGenerator.generateFeedPdf(context, profile, coop, cycle, feedStocks, photos)
+                            PdfReportGenerator.generateFeedPdf(context, profile!!, coop, cycle, feedStocks, photos)
                         }
                         8 -> {
-                            PdfReportGenerator.generateMedicinePdf(context, profile, coop, cycle, medicines, photos)
+                            PdfReportGenerator.generateMedicinePdf(context, profile!!, coop, cycle, medicines, photos)
                         }
                         9 -> {
-                            PdfReportGenerator.generateWeightPdf(context, profile, coop, cycle, weightSamples, photos)
+                            PdfReportGenerator.generateWeightPdf(context, profile!!, coop, cycle, weightSamples, photos)
                         }
                         10 -> {
-                            PdfReportGenerator.generateHarvestPdf(context, profile, coop, partner, cycle, harvests, photos)
+                            PdfReportGenerator.generateHarvestPdf(context, profile!!, coop, partner, cycle, harvests, photos)
                         }
                         else -> {
-                            PdfReportGenerator.generatePhotoEvidencePdf(context, profile, coop, cycle, photos)
+                            PdfReportGenerator.generatePhotoEvidencePdf(context, profile!!, coop, cycle, photos)
                         }
                     }
                 }
@@ -163,9 +169,9 @@ fun ReportsPdfScreen(
                 if (file != null && file.exists()) {
                     generatedFile = file
                     processState = ProcessState.Success(
-                        title = "PDF BERHASIL DISIMPAN",
-                        message = "Dokumen resmi telah berhasil digenerate dan tersimpan di penyimpanan perangkat.",
-                        detail = "Lokasi file: ${file.name}",
+                        title = "PDF BERHASIL DIBUAT",
+                        message = "PDF berhasil dibuat dan siap disimpan.",
+                        detail = "Nama Dokumen: ${file.name}",
                         onDismiss = {
                             onComplete(file)
                         }
@@ -173,13 +179,13 @@ fun ReportsPdfScreen(
                 } else {
                     processState = ProcessState.Error(
                         title = "Gagal Membuat PDF",
-                        message = "Data untuk jenis laporan yang dipilih belum lengkap (misalnya siklus aktif atau kandang belum dipilih)."
+                        message = "Data belum dapat dibuat menjadi PDF karena terdapat ketidaksesuaian. Silakan periksa data terlebih dahulu."
                     )
                 }
             } catch (e: Exception) {
                 processState = ProcessState.Error(
                     title = "Terjadi Kesalahan",
-                    message = "Gagal menyusun PDF: ${e.localizedMessage ?: "kesalahan sistem"}"
+                    message = "Gagal memproses dokumen: ${e.localizedMessage ?: "Kesalahan tak terduga"}"
                 )
             }
         }
@@ -226,7 +232,7 @@ fun ReportsPdfScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text("SEJAHTERA BERSAMA PDF ENGINE", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FarmGreenPrimary)
-                                Text("Format Standar A4 Cetak Resmi & Bukti Foto GPS", fontSize = 12.sp, color = Color.DarkGray)
+                                Text("Format Standar A4 Cetak Resmi, Subtotal Akurat & Bukti Foto GPS", fontSize = 12.sp, color = Color.DarkGray)
                             }
                         }
                     }
@@ -234,8 +240,34 @@ fun ReportsPdfScreen(
             }
 
             item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigate("profit_sharing") }
+                        .testTag("btn_goto_profit_sharing"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF2E7D32)))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color(0xFF1B5E20), modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Laporan Hasil Pembagian Anggota", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1B5E20))
+                            Text("Kalkulasi sama rata, sisa pembulatan, rincian per anggota & tanda tangan lapang.", fontSize = 11.5.sp, color = Color.DarkGray)
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF1B5E20))
+                    }
+                }
+            }
+
+            item {
                 Text("PILIH JENIS LAPORAN:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.DarkGray)
             }
+
 
             items(reportOptions) { opt ->
                 ReportTypeCard(
@@ -255,7 +287,7 @@ fun ReportsPdfScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text("Parameter Laporan yang Akan Digenerate:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.DarkGray)
+                        Text("Parameter Siklus & Kandang Aktif:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.DarkGray)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("• Siklus: ${currentCycle?.cycleNumber ?: "Semua Siklus"}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         Text("• Kandang: ${currentCoop?.name ?: "Semua Kandang"} (${currentCoop?.address ?: "-"})", fontSize = 12.sp)
@@ -291,29 +323,59 @@ fun ReportsPdfScreen(
                         Text("BUAT & BUKA PREVIEW PDF", fontWeight = FontWeight.Bold)
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            if (isProcessingNow) return@OutlinedButton
-                            val readyFile = generatedFile
-                            if (readyFile != null && readyFile.exists()) {
-                                PdfReportGenerator.sharePdf(context, readyFile)
-                            } else {
-                                generateSelectedPdf { file ->
-                                    if (file != null) {
-                                        PdfReportGenerator.sharePdf(context, file)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (isProcessingNow) return@OutlinedButton
+                                val readyFile = generatedFile
+                                if (readyFile != null && readyFile.exists()) {
+                                    PdfReportGenerator.sharePdf(context, readyFile)
+                                } else {
+                                    generateSelectedPdf { file ->
+                                        if (file != null) {
+                                            PdfReportGenerator.sharePdf(context, file)
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        enabled = !isProcessingNow,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("btn_share_pdf")
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, tint = FarmGreenPrimary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("BAGIKAN PDF (WHATSAPP / EMAIL)", fontWeight = FontWeight.Bold, color = FarmGreenPrimary)
+                            },
+                            enabled = !isProcessingNow,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("btn_share_pdf")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, tint = FarmGreenPrimary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("BAGIKAN", fontWeight = FontWeight.Bold, color = FarmGreenPrimary, fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (isProcessingNow) return@OutlinedButton
+                                val readyFile = generatedFile
+                                if (readyFile != null && readyFile.exists()) {
+                                    PdfReportGenerator.printPdf(context, readyFile)
+                                } else {
+                                    generateSelectedPdf { file ->
+                                        if (file != null) {
+                                            PdfReportGenerator.printPdf(context, file)
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isProcessingNow,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("btn_print_pdf")
+                        ) {
+                            Icon(Icons.Default.Print, contentDescription = null, tint = FarmGreenPrimary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("CETAK (PRINT)", fontWeight = FontWeight.Bold, color = FarmGreenPrimary, fontSize = 12.sp)
+                        }
                     }
                 }
             }
