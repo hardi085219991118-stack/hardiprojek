@@ -37,14 +37,17 @@ android {
   }
 
   buildTypes {
-    release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.findByName("release")
-    }
-    debug { 
+  release {
+    isCrunchPngs = false
+    isMinifyEnabled = false
+    proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+    signingConfig = signingConfigs.findByName("release")
   }
+  debug {
+    isMinifyEnabled = false
+    isDebuggable = true
+  }
+}
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
